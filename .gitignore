@@ -14,3 +14,5 @@ coverage/
 tsconfig.tsbuildinfo
 test-report.html
 *.DS_Store
+src/lang/.antlr/*
+test.swift

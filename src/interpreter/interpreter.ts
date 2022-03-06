@@ -199,6 +199,8 @@ function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
  */
 // tslint:disable:object-literal-shorthand
 // prettier-ignore
+// Mapped Types
+// https://www.typescriptlang.org/docs/handbook/2/mapped-types.html#handbook-content
 export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     /** Simple Values */
     Literal: function*(node: es.Literal, context: Context) {
@@ -351,6 +353,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 // tslint:enable:object-literal-shorthand
 
 export function* evaluate(node: es.Node, context: Context) {
+  //Debug
+  console.log("Begin evaluation...")
+
   yield* visit(context, node)
   const result = yield* evaluators[node.type](node, context)
   yield* leave(context)

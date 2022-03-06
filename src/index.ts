@@ -232,11 +232,22 @@ export async function runInContext(
   context.variant = determineVariant(context, options)
   context.errors = []
 
+  //Debug
+  console.log("Begin parsing...")
+
   const program = parse(code, context)
   if (!program) {
     return resolvedErrorPromise
   }
+
+  //Debug
+  console.log("Begin validation...")
+
   validateAndAnnotate(program as Program, context)
+
+  //Debug
+  console.log("Begin typeChecking...")
+
   typeCheck(program, context)
   if (context.errors.length > 0) {
     return resolvedErrorPromise

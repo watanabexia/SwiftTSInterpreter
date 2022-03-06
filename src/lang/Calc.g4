@@ -8,20 +8,32 @@ MUL: '*';
 DIV: '/';
 ADD: '+';
 SUB: '-';
+// MOD: '%';
 NUMBER: [0-9]+;
-WHITESPACE: [ \r\n\t]+ -> skip;
+WHITESPACE: [ \t]+ -> skip;
+NEWLINE: '\r'? '\n';
+SEMICOL: ';' ;
 
 /*
  * Productions
  */
-start : expression;
+prog: stat+ ;
 
-expression
-   : NUMBER                                         # Number
-   | '(' inner=expression ')'                       # Parentheses
-   | left=expression operator=POW right=expression  # Power
-   | left=expression operator=MUL right=expression  # Multiplication
-   | left=expression operator=DIV right=expression  # Division
-   | left=expression operator=ADD right=expression  # Addition
-   | left=expression operator=SUB right=expression  # Subtraction
+stat: expression=expr NEWLINE                      # ExprStat
+    | expression=expr SEMICOL NEWLINE              # ExprStat
+    | expression=expr EOF                          # ExprStat
+    | expression=expr SEMICOL EOF                  # ExprStat
+    | NEWLINE                           # EmptStat
+    | NEWLINE EOF                       # EmptStat
+    ;
+
+expr
+   : NUMBER                             # Number
+   | '(' inner=expr ')'                 # Parentheses
+   | left=expr operator=POW right=expr  # Power
+   | left=expr operator=MUL right=expr  # Multiplication
+   | left=expr operator=DIV right=expr  # Division
+   | left=expr operator=ADD right=expr  # Addition
+   | left=expr operator=SUB right=expr  # Subtraction
+//    | left=expr operator=MOD right=expr  # Modulo
    ;
