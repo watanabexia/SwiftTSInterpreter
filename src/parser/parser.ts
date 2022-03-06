@@ -219,17 +219,17 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-function convertExpression(expression: ExprContext): es.Expression {
-  const generator = new ExpressionGenerator()
-  return expression.accept(generator)
-}
+// function convertExpression(expression: ExprContext): es.Expression {
+//   const generator = new ExpressionGenerator()
+//   return expression.accept(generator)
+// }
 
 class StatementGenerator implements CalcVisitor<es.Statement> {
   visitExprStat(ctx: ExprStatContext): es.Statement {
     const generator = new ExpressionGenerator()
     return {
       type: 'ExpressionStatement',
-      expression: generator.visit(ctx._expression),
+      expression: ctx._expression.accept(generator),
       loc: contextToLocation(ctx)
     }
   }
@@ -248,7 +248,7 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
   visitChildren(node: RuleNode): es.Statement {
     return node.accept(this)
   }
-  
+
   visitTerminal(node: TerminalNode): es.Statement {
     return node.accept(this)
   }
@@ -272,7 +272,7 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
 
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
-    let ESTreeProgram: es.Program = {
+    const ESTreeProgram: es.Program = {
       type: 'Program',
       sourceType: 'script',
       body: []
@@ -283,14 +283,13 @@ class ProgramGenerator implements CalcVisitor<es.Program> {
 
     const generator = new StatementGenerator()
     for (let i = 0; i < ctx.stat().length; i++) {
-
       //Debug
       // console.log(ctx.stat(i))
 
       ESTreeProgram.body.push(ctx.stat(i).accept(generator))
 
       //Debug
-      console.log("Statement converted.")
+      // console.log('Statement converted.')
     }
 
     return ESTreeProgram
@@ -303,7 +302,7 @@ class ProgramGenerator implements CalcVisitor<es.Program> {
   visitChildren(node: RuleNode): es.Program {
     return node.accept(this)
   }
-  
+
   visitTerminal(node: TerminalNode): es.Program {
     return node.accept(this)
   }
@@ -356,27 +355,24 @@ export function parse(source: string, context: Context) {
       const tree = parser.prog() // Use the rule "prog" to parse the file
 
       //Debug
-      console.log("ANTLR AST Detected!")
+      console.log('ANTLR AST Detected!')
       console.log(tree.toStringTree(parser))
 
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
-    
+
       //Debug
-      console.log("ESTree AST:")
+      console.log('ESTree AST:')
       console.log(program)
-      console.log(convertExpression(tree))
-    
+      
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
-
         //Debug
-        console.log("[ERROR] SyntaxError Detected")
+        console.log('[ERROR] SyntaxError Detected')
 
         context.errors.push(error)
       } else {
-
         //Debug
-        console.log("[ERROR] Unknown Error Detected")
+        console.log('[ERROR] Unknown Error Detected')
 
         throw error
       }

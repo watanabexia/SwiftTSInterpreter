@@ -233,7 +233,7 @@ export async function runInContext(
   context.errors = []
 
   //Debug
-  console.log("Begin parsing...")
+  console.log('Begin parsing...')
 
   const program = parse(code, context)
   if (!program) {
@@ -241,12 +241,12 @@ export async function runInContext(
   }
 
   //Debug
-  console.log("Begin validation...")
+  console.log('Begin validation...')
 
   validateAndAnnotate(program as Program, context)
 
   //Debug
-  console.log("Begin typeChecking...")
+  console.log('Begin typeChecking...')
 
   typeCheck(program, context)
   if (context.errors.length > 0) {
@@ -259,6 +259,9 @@ export async function runInContext(
     await runInContext(prelude, context, { ...options, isPrelude: true })
     return runInContext(code, context, options)
   }
+
+  //Debug
+  console.log('Begin evaluation...')
 
   const it = evaluate(program, context)
   const scheduler: Scheduler = new PreemptiveScheduler(theOptions.steps)

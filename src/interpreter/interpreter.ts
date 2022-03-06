@@ -348,14 +348,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         pushEnvironment(context, environment)
         const result = yield* forceIt(yield* evaluateBlockSatement(context, node), context);
         return result;
+    },
+
+    EmptyStatement: function*(node: es.EmptyStatement, context: Context) {
+        return null;
     }
 }
 // tslint:enable:object-literal-shorthand
 
 export function* evaluate(node: es.Node, context: Context) {
-  //Debug
-  console.log("Begin evaluation...")
-
   yield* visit(context, node)
   const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
