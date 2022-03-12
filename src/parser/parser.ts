@@ -8,13 +8,19 @@ import {
   AdditionContext,
   CalcParser,
   DivisionContext,
-  ExpressionContext,
+  ExprContext,
+  ExprStatContext,
+  EmptStatContext,
   MultiplicationContext,
   NumberContext,
   ParenthesesContext,
   PowerContext,
-  StartContext,
-  SubtractionContext
+  ProgContext,
+  StatContext,
+  SubtractionContext,
+  DecimalContext,
+  TrueContext,
+  FalseContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -107,7 +113,7 @@ export class TrailingCommaError implements SourceError {
   }
 }
 
-function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
+function contextToLocation(ctx: ExprContext): es.SourceLocation {
   return {
     start: {
       line: ctx.start.line,
@@ -128,8 +134,36 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+
+  visitDecimal(ctx: DecimalContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: parseFloat(ctx.text),
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitTrue(ctx: TrueContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: true,
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitFalse(ctx: FalseContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: false,
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
   visitParentheses(ctx: ParenthesesContext): es.Expression {
-    return this.visit(ctx.expression())
+    return this.visit(ctx.expr())
   }
   visitPower(ctx: PowerContext): es.Expression {
     return {
@@ -179,8 +213,8 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitExpression?: ((ctx: ExpressionContext) => es.Expression) | undefined
-  visitStart?: ((ctx: StartContext) => es.Expression) | undefined
+  visitExpression?: ((ctx: ExprContext) => es.Expression) | undefined
+  visitStart?: ((ctx: StatContext) => es.Expression) | undefined
 
   visit(tree: ParseTree): es.Expression {
     return tree.accept(this)
@@ -216,23 +250,128 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-function convertExpression(expression: ExpressionContext): es.Expression {
-  const generator = new ExpressionGenerator()
-  return expression.accept(generator)
-}
+// function convertExpression(expression: ExprContext): es.Expression {
+//   const generator = new ExpressionGenerator()
+//   return expression.accept(generator)
+// }
 
-function convertSource(expression: ExpressionContext): es.Program {
-  return {
-    type: 'Program',
-    sourceType: 'script',
-    body: [
+class StatementGenerator implements CalcVisitor<es.Statement> {
+  visitExprStat(ctx: ExprStatContext): es.Statement {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'ExpressionStatement',
+      expression: ctx._expression.accept(generator),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitEmptStat(ctx: EmptStatContext): es.Statement {
+    return {
+      type: 'EmptyStatement',
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visit(tree: ParseTree): es.Statement {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.Statement {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.Statement {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.Statement {
+    throw new FatalSyntaxError(
       {
-        type: 'ExpressionStatement',
-        expression: convertExpression(expression)
-      }
-    ]
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
   }
 }
+
+class ProgramGenerator implements CalcVisitor<es.Program> {
+  visitProg(ctx: ProgContext): es.Program {
+    const ESTreeProgram: es.Program = {
+      type: 'Program',
+      sourceType: 'script',
+      body: []
+    }
+
+    //Debug
+    // console.log("VISITPROG!!")
+
+    const generator = new StatementGenerator()
+    for (let i = 0; i < ctx.stat().length; i++) {
+      //Debug
+      // console.log(ctx.stat(i))
+
+      ESTreeProgram.body.push(ctx.stat(i).accept(generator))
+
+      //Debug
+      // console.log('Statement converted.')
+    }
+
+    return ESTreeProgram
+  }
+
+  visit(tree: ParseTree): es.Program {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.Program {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.Program {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.Program {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
+}
+
+function convertProgram(prog: ProgContext): es.Program {
+  const generator = new ProgramGenerator()
+  return prog.accept(generator)
+}
+
+// function convertSource(expr: ExprContext): es.Program {
+//   return {
+//     type: 'Program',
+//     sourceType: 'script',
+//     body: [
+//       {
+//         type: 'ExpressionStatement',
+//         expression: convertExpression(expr)
+//       }
+//     ]
+//   }
+// }
 
 export function parse(source: string, context: Context) {
   let program: es.Program | undefined
@@ -244,12 +383,28 @@ export function parse(source: string, context: Context) {
     const parser = new CalcParser(tokenStream)
     parser.buildParseTree = true
     try {
-      const tree = parser.expression()
-      program = convertSource(tree)
+      const tree = parser.prog() // Use the rule "prog" to parse the file
+
+      //Debug
+      // console.log('ANTLR AST Detected!')
+      // console.log(tree.toStringTree(parser))
+      console.log(tree.toStringTree(parser))
+
+      program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
+
+      //Debug
+      console.log('ESTree AST:')
+      console.log(program)
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
+        //Debug
+        console.log('[ERROR] SyntaxError Detected')
+
         context.errors.push(error)
       } else {
+        //Debug
+        console.log('[ERROR] Unknown Error Detected')
+
         throw error
       }
     }
