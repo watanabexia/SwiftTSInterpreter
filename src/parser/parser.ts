@@ -17,7 +17,8 @@ import {
   PowerContext,
   ProgContext,
   StatContext,
-  SubtractionContext
+  SubtractionContext,
+  DecimalContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -131,6 +132,16 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+
+  visitDecimal(ctx: DecimalContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: parseFloat(ctx.text),
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expr())
   }
@@ -355,15 +366,14 @@ export function parse(source: string, context: Context) {
       const tree = parser.prog() // Use the rule "prog" to parse the file
 
       //Debug
-      console.log('ANTLR AST Detected!')
-      console.log(tree.toStringTree(parser))
+      // console.log('ANTLR AST Detected!')
+      // console.log(tree.toStringTree(parser))
 
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
 
       //Debug
-      console.log('ESTree AST:')
-      console.log(program)
-      
+      // console.log('ESTree AST:')
+      // console.log(program)
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
         //Debug

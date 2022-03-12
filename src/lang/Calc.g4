@@ -29,6 +29,7 @@ stat: expression=expr NEWLINE                      # ExprStat
 
 expr
    : NUMBER                             # Number
+   | int=expr '.' frac=expr             # Decimal
    | '(' inner=expr ')'                 # Parentheses
    | left=expr operator=POW right=expr  # Power
    | left=expr operator=MUL right=expr  # Multiplication
