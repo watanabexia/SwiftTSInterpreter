@@ -6,6 +6,8 @@ import { ParseTreeVisitor } from "antlr4ts/tree/ParseTreeVisitor";
 import { ExprStatContext } from "./CalcParser";
 import { EmptStatContext } from "./CalcParser";
 import { NumberContext } from "./CalcParser";
+import { TrueContext } from "./CalcParser";
+import { FalseContext } from "./CalcParser";
 import { DecimalContext } from "./CalcParser";
 import { ParenthesesContext } from "./CalcParser";
 import { PowerContext } from "./CalcParser";
@@ -49,6 +51,22 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitNumber?: (ctx: NumberContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `True`
+	 * labeled alternative in `CalcParser.expr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitTrue?: (ctx: TrueContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `False`
+	 * labeled alternative in `CalcParser.expr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitFalse?: (ctx: FalseContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by the `Decimal`

@@ -8,6 +8,8 @@ MUL: '*';
 DIV: '/';
 ADD: '+';
 SUB: '-';
+TRUE: 'true';
+FALSE: 'false';
 // MOD: '%';
 NUMBER: [0-9]+;
 WHITESPACE: [ \t]+ -> skip;
@@ -29,6 +31,8 @@ stat: expression=expr NEWLINE                      # ExprStat
 
 expr
    : NUMBER                             # Number
+   | TRUE                               # True
+   | FALSE                              # False
    | int=expr '.' frac=expr             # Decimal
    | '(' inner=expr ')'                 # Parentheses
    | left=expr operator=POW right=expr  # Power

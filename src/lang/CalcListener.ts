@@ -6,6 +6,8 @@ import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
 import { ExprStatContext } from "./CalcParser";
 import { EmptStatContext } from "./CalcParser";
 import { NumberContext } from "./CalcParser";
+import { TrueContext } from "./CalcParser";
+import { FalseContext } from "./CalcParser";
 import { DecimalContext } from "./CalcParser";
 import { ParenthesesContext } from "./CalcParser";
 import { PowerContext } from "./CalcParser";
@@ -61,6 +63,32 @@ export interface CalcListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitNumber?: (ctx: NumberContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `True`
+	 * labeled alternative in `CalcParser.expr`.
+	 * @param ctx the parse tree
+	 */
+	enterTrue?: (ctx: TrueContext) => void;
+	/**
+	 * Exit a parse tree produced by the `True`
+	 * labeled alternative in `CalcParser.expr`.
+	 * @param ctx the parse tree
+	 */
+	exitTrue?: (ctx: TrueContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `False`
+	 * labeled alternative in `CalcParser.expr`.
+	 * @param ctx the parse tree
+	 */
+	enterFalse?: (ctx: FalseContext) => void;
+	/**
+	 * Exit a parse tree produced by the `False`
+	 * labeled alternative in `CalcParser.expr`.
+	 * @param ctx the parse tree
+	 */
+	exitFalse?: (ctx: FalseContext) => void;
 
 	/**
 	 * Enter a parse tree produced by the `Decimal`
