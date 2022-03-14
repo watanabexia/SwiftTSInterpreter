@@ -5,7 +5,7 @@ import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
 import { primitive } from '../utils/astCreator'
-import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
+import {evaluateBinaryExpression, evaluateLogicalExpression, evaluateUnaryExpression} from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
 
@@ -282,7 +282,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     LogicalExpression: function*(node: es.LogicalExpression, context: Context) {
-        throw new Error("Logical expressions not supported in x-slang");
+        const left = yield* actualValue(node.left, context)
+        const right = yield* actualValue(node.right, context)
+        //TODO make check work with logical expressions
+        /*
+        const error = rttc.checkBinaryExpression(node, node.operator, left, right)
+        if (error) {
+            return handleRuntimeError(context, error)
+        }
+         */
+        return evaluateLogicalExpression(node.operator, left, right)
     },
 
     VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {

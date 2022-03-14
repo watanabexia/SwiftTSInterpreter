@@ -20,7 +20,17 @@ import {
   SubtractionContext,
   DecimalContext,
   TrueContext,
-  FalseContext
+  FalseContext,
+  EqualContext,
+  NotEqualContext,
+  GreaterThanOrEqualContext,
+  LessThanOrEqualContext,
+  GreaterThanContext,
+  LessThanContext,
+  ModuloContext,
+  LogicalOrContext,
+  LogicalAndContext,
+  LogicalNotContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -165,6 +175,67 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expr())
   }
+
+  visitEqual(ctx: EqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '==',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitNotEqual(ctx: NotEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '!=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitGreaterThanOrEqual(ctx: GreaterThanOrEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '>=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitLessThanOrEqual(ctx: LessThanOrEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '<=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitGreaterThan(ctx: GreaterThanContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '>',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitLessThan(ctx: LessThanContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '<',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
   visitPower(ctx: PowerContext): es.Expression {
     return {
       type: 'BinaryExpression',
@@ -193,6 +264,15 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+  visitModulo(ctx: ModuloContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '%',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
   visitAddition(ctx: AdditionContext): es.Expression {
     return {
       type: 'BinaryExpression',
@@ -209,6 +289,33 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       operator: '-',
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitLogicalOr(ctx: LogicalOrContext): es.Expression {
+    return {
+      type: 'LogicalExpression',
+      operator: '||',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitLogicalAnd(ctx: LogicalAndContext): es.Expression {
+    return {
+      type: 'LogicalExpression',
+      operator: '&&',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitLogicalNot(ctx: LogicalNotContext): es.Expression {
+    return {
+      type: 'UnaryExpression',
+      operator: '!',
+      prefix: true,
+      argument: this.visit(ctx._argument),
       loc: contextToLocation(ctx)
     }
   }
