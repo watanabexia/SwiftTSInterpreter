@@ -18,7 +18,24 @@ import {
   ProgContext,
   StatContext,
   SubtractionContext,
-  DecimalContext
+  DecimalContext,
+  DeclareStatContext,
+  NameContext,
+  AssignStatContext,
+  TrueContext,
+  FalseContext,
+  EqualContext,
+  NotEqualContext,
+  GreaterThanOrEqualContext,
+  LessThanOrEqualContext,
+  GreaterThanContext,
+  LessThanContext,
+  ModuloContext,
+  LogicalOrContext,
+  LogicalAndContext,
+  LogicalNotContext,
+  StringContext,
+  DeclareValueStatContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -142,9 +159,105 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
+  visitTrue(ctx: TrueContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: true,
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitFalse(ctx: FalseContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: false,
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitName(ctx: NameContext): es.Expression {
+    return {
+      type: 'Identifier',
+      name: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitString(ctx: StringContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: ctx.text.slice(1,-1),
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expr())
   }
+
+  visitEqual(ctx: EqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '==',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitNotEqual(ctx: NotEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '!=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitGreaterThanOrEqual(ctx: GreaterThanOrEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '>=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitLessThanOrEqual(ctx: LessThanOrEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '<=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitGreaterThan(ctx: GreaterThanContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '>',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitLessThan(ctx: LessThanContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '<',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
   visitPower(ctx: PowerContext): es.Expression {
     return {
       type: 'BinaryExpression',
@@ -173,6 +286,15 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+  visitModulo(ctx: ModuloContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '%',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
   visitAddition(ctx: AdditionContext): es.Expression {
     return {
       type: 'BinaryExpression',
@@ -189,6 +311,33 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       operator: '-',
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitLogicalOr(ctx: LogicalOrContext): es.Expression {
+    return {
+      type: 'LogicalExpression',
+      operator: '||',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitLogicalAnd(ctx: LogicalAndContext): es.Expression {
+    return {
+      type: 'LogicalExpression',
+      operator: '&&',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitLogicalNot(ctx: LogicalNotContext): es.Expression {
+    return {
+      type: 'UnaryExpression',
+      operator: '!',
+      prefix: true,
+      argument: this.visit(ctx._argument),
       loc: contextToLocation(ctx)
     }
   }
@@ -230,13 +379,8 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-// function convertExpression(expression: ExprContext): es.Expression {
-//   const generator = new ExpressionGenerator()
-//   return expression.accept(generator)
-// }
-
 class StatementGenerator implements CalcVisitor<es.Statement> {
-  visitExprStat(ctx: ExprStatContext): es.Statement {
+  visitExprStat(ctx: ExprStatContext): es.ExpressionStatement {
     const generator = new ExpressionGenerator()
     return {
       type: 'ExpressionStatement',
@@ -245,9 +389,61 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 
-  visitEmptStat(ctx: EmptStatContext): es.Statement {
+  visitEmptStat(ctx: EmptStatContext): es.EmptyStatement {
     return {
       type: 'EmptyStatement',
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitDeclareStat(ctx: DeclareStatContext): es.Declaration {
+    return {
+      type: 'VariableDeclaration',
+      declarations: [{
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: <string>ctx._id.text
+        },
+        init: undefined,
+        TYPE: <string>ctx._type.text
+      }],
+      kind: <'var'|'let'>(ctx._declare_type.text),
+      loc: contextToLocation(ctx),
+    }
+  }
+
+  visitDeclareValueStat(ctx: DeclareValueStatContext): es.Declaration {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'VariableDeclaration',
+      declarations: [{
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: <string>ctx._id.text
+        },
+        init: ctx._value.accept(generator),
+        TYPE: 'UNKNOWN'
+      }],
+      kind: <'var'|'let'>(ctx._declare_type.text),
+      loc: contextToLocation(ctx),
+    }
+  }
+
+  visitAssignStat(ctx: AssignStatContext): es.ExpressionStatement {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'ExpressionStatement',
+      expression: {
+        type: 'AssignmentExpression',
+        operator: '=',
+        left: {
+          type: 'Identifier',
+          name: <string>ctx._id.text
+        },
+        right: ctx._value.accept(generator)
+      },
       loc: contextToLocation(ctx)
     }
   }
@@ -280,7 +476,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     )
   }
 }
-
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
     const ESTreeProgram: es.Program = {
@@ -367,13 +562,14 @@ export function parse(source: string, context: Context) {
 
       //Debug
       // console.log('ANTLR AST Detected!')
-      // console.log(tree.toStringTree(parser))
+      console.log(tree.toStringTree(parser))
 
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
 
       //Debug
-      // console.log('ESTree AST:')
-      // console.log(program)
+      console.log('ESTree AST:')
+      console.log(program)
+      // console.log(program['body'][2]['expression'])
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
         //Debug

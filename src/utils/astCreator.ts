@@ -37,6 +37,7 @@ export const declaration = (
   name: string,
   kind: AllowedDeclarations,
   init: es.Expression,
+  TYPE: string,
   loc?: es.SourceLocation | null
 ): es.VariableDeclaration => ({
   type: 'VariableDeclaration',
@@ -44,7 +45,8 @@ export const declaration = (
     {
       type: 'VariableDeclarator',
       id: identifier(name),
-      init
+      init,
+      TYPE
     }
   ],
   kind,
@@ -54,8 +56,9 @@ export const declaration = (
 export const constantDeclaration = (
   name: string,
   init: es.Expression,
+  TYPE: string,
   loc?: es.SourceLocation | null
-) => declaration(name, 'const', init, loc)
+) => declaration(name, 'const', init, TYPE, loc)
 
 export const callExpression = (
   callee: es.Expression,
@@ -315,12 +318,14 @@ export const variableDeclaration = (
 export const variableDeclarator = (
   id: es.Pattern,
   init: es.Expression,
+  TYPE: string,
   loc?: es.SourceLocation | null
 ): es.VariableDeclarator => ({
   type: 'VariableDeclarator',
   id,
   init,
-  loc
+  loc,
+  TYPE
 })
 
 export const ifStatement = (

@@ -94,6 +94,26 @@ const handleRuntimeError = (context: Context, error: RuntimeSourceError): never 
 
 const DECLARED_BUT_NOT_YET_ASSIGNED = Symbol('Used to implement hoisting')
 
+function get_type(value: any) {
+  let v_type = ""
+  switch (typeof(value)) {
+    case 'number':
+      if (value % 1 === 0) {
+        v_type = 'Int'
+      } else {
+        v_type = 'Double'
+      }
+      break
+    case 'string':
+      v_type = 'String'
+      break
+    case 'boolean':
+      v_type = 'Bool'
+      break
+  }
+  return v_type
+}
+
 function declareIdentifier(context: Context, name: string, node: es.Node) {
   const environment = currentEnvironment(context)
   if (environment.head.hasOwnProperty(name)) {
@@ -105,6 +125,11 @@ function declareIdentifier(context: Context, name: string, node: es.Node) {
     )
   }
   environment.head[name] = DECLARED_BUT_NOT_YET_ASSIGNED
+
+  //Debug
+  // console.log("Declaring variables...")
+  // console.log(environment)
+
   return environment
 }
 
@@ -124,6 +149,55 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
         declareIdentifier(context, (statement.id as es.Identifier).name, statement)
         break
     }
+  }
+}
+
+function assignVariables(context: Context, name: string, value: any, node: es.Node) {
+  const environment = currentEnvironment(context)
+  if (environment.head.hasOwnProperty(name)) {
+    if (typeof(environment.head[name]) !== 'symbol') {
+      let v_type = get_type(value)
+      const i_type = environment.head[name]['TYPE']
+      if (v_type !== i_type) {
+        return handleRuntimeError(context, new errors.TypeAssignmentError(node, name, i_type, v_type))
+      }
+
+      const i_mutable = environment.head[name]['mutable']
+      const i_value = environment.head[name]['value']
+      if (i_mutable === false && i_value !== undefined) {
+        return handleRuntimeError(context, new errors.ConstAssignment(node, name))
+      }
+
+      environment.head[name]['value'] = value
+
+    } else { // First-time initialization
+      environment.head[name] = value
+    }
+  } else {
+    return handleRuntimeError(context, new errors.UndefinedVariable(name, node))
+  }
+  
+  return environment
+}
+
+function evaluateIdentifier(context: Context, name: string, node: es.Node) {
+  const environment = currentEnvironment(context)
+  if (environment.head.hasOwnProperty(name)) {
+
+    //Debug
+    // console.log(environment.head[name])
+
+    if (typeof(environment.head[name]) === "symbol") {
+      return handleRuntimeError(context, new errors.UnassignedVariable(name, node))
+    } else {
+      if (environment.head[name]['value'] === undefined) {
+        return handleRuntimeError(context, new errors.UndefinedError(node, name, environment.head[name]))
+      } else {
+        return environment.head[name]['value']
+      }
+    }
+  } else {
+    return handleRuntimeError(context, new errors.UndefinedVariable(name, node))
   }
 }
 
@@ -171,10 +245,26 @@ const checkNumberOfArguments = (
 export type Evaluator<T extends es.Node> = (node: T, context: Context) => IterableIterator<Value>
 
 function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
+
+  //Debug
+  // console.log("[Block] start eval statements")
+
   declareFunctionsAndVariables(context, node)
+
+  //Debug
+  // console.log("[Block] start eval statements")
+
   let result
   for (const statement of node.body) {
+
+    //Debug
+    // console.log("[Block] eval statement")
+
     result = yield* evaluate(statement, context)
+
+    //Debug
+    // console.log(result)
+
     if (
       result instanceof ReturnValue ||
       result instanceof TailCallReturnValue ||
@@ -233,7 +323,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     Identifier: function*(node: es.Identifier, context: Context) {
-        throw new Error("Variables not supported in x-slang");
+        //Debug
+        // console.log("Identifier!")
+        const name = node.name
+        return evaluateIdentifier(context, name, node)
+
+        // throw new Error("Variables not supported in x-slang");
     },
 
     CallExpression: function*(node: es.CallExpression, context: Context) {
@@ -286,7 +381,46 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
-        throw new Error("Variable declarations not supported in x-slang");
+        //Debug
+        // console.log("[VariableDecla] !")
+
+        const kind = node.kind
+        let mutable = true
+        switch (kind) {
+          case "let":
+            mutable = false
+            break
+          case "var":
+            mutable = true
+            break
+        } 
+
+        for (const declaration of node.declarations) {
+          const name = (<es.Identifier>declaration.id).name
+          let value = declaration.init
+          let type = declaration.TYPE
+
+          if (value !== undefined) {
+            value = yield* evaluate(<es.Expression>value, context)
+            type = get_type(value)
+          }
+
+          const real_value = {
+            "type": "Literal",
+            "mutable": mutable,
+            "TYPE": type,
+            "value": value
+          }
+
+          //Debug
+          // console.log("REAL_VALUE")
+          // console.log(real_value)
+
+          assignVariables(context, name, real_value, node)
+        }
+
+        return null;
+        // throw new Error("Variable declarations not supported in x-slang");
     },
 
     ContinueStatement: function*(node: es.ContinueStatement, context: Context) {
@@ -307,7 +441,18 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     AssignmentExpression: function*(node: es.AssignmentExpression, context: Context) {
-        throw new Error("Assignment expressions not supported in x-slang");
+        //Debug
+        // console.log("Assignment");
+
+        const name = (<es.Identifier>node.left).name
+        const value = yield* evaluate(node.right, context)
+
+        //Debug
+        // console.log(value)
+        
+        assignVariables(context, name, value, node)
+
+        return null;
     },
 
     FunctionDeclaration: function*(node: es.FunctionDeclaration, context: Context) {
@@ -343,10 +488,21 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     Program: function*(node: es.BlockStatement, context: Context) {
+        //Debug
+        // console.log("[Program] Eval Program...")
+
         context.numberOfOuterEnvironments += 1
         const environment = createBlockEnvironment(context, 'programEnvironment')
         pushEnvironment(context, environment)
+
+        //Debug
+        // console.log("[Program] Start eval block")
+
         const result = yield* forceIt(yield* evaluateBlockSatement(context, node), context);
+
+        //Debug
+        // console.log("[Program] Program finished.")
+
         return result;
     },
 
@@ -357,6 +513,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 // tslint:enable:object-literal-shorthand
 
 export function* evaluate(node: es.Node, context: Context) {
+  //Debug
+  // console.log("Evaluating...")
+  // console.log(node)
+
   yield* visit(context, node)
   const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
