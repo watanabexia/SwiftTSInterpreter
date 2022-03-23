@@ -1,4 +1,4 @@
-import { BinaryOperator, UnaryOperator } from 'estree'
+import {BinaryOperator, LogicalOperator, UnaryOperator} from 'estree'
 import {
   CallingNonFunctionValue,
   ExceptionError,
@@ -160,9 +160,9 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return left / right
     case '%':
       return left % right
-    case '===':
+    case '==':
       return left === right
-    case '!==':
+    case '!=':
       return left !== right
     case '<=':
       return left <= right
@@ -174,6 +174,25 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return left >= right
     default:
       return undefined
+  }
+}
+
+export function evaluateLogicalExpression(operator: LogicalOperator, left: any, right: any) {
+  switch (operator) {
+    case '||':
+      return left || right
+    case '&&':
+      return left && right
+    default:
+      return undefined
+  }
+}
+
+export function evaluateIfStatement(test: any, consequent: any, alternate: any) {
+  if(test == true) {
+    return consequent
+  } else if (alternate != null) {
+    return alternate
   }
 }
 

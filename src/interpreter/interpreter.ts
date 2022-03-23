@@ -5,7 +5,12 @@ import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
 import { primitive } from '../utils/astCreator'
-import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
+import {
+    evaluateBinaryExpression,
+    evaluateIfStatement,
+    evaluateLogicalExpression,
+    evaluateUnaryExpression
+} from '../utils/operators'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
 
@@ -377,7 +382,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     LogicalExpression: function*(node: es.LogicalExpression, context: Context) {
-        throw new Error("Logical expressions not supported in x-slang");
+        const left = yield* actualValue(node.left, context)
+        const right = yield* actualValue(node.right, context)
+        //TODO make check work with logical expressions
+        /*
+        const error = rttc.checkBinaryExpression(node, node.operator, left, right)
+        if (error) {
+            return handleRuntimeError(context, error)
+        }
+         */
+        return evaluateLogicalExpression(node.operator, left, right)
     },
 
     VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
@@ -460,7 +474,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
-        throw new Error("If statements not supported in x-slang");
+        const test = yield* actualValue(node.test, context)
+        const consequent = yield* actualValue(node.consequent, context)
+        let alternate;
+        if(node.alternate != null) {
+            alternate = yield* actualValue(node.alternate, context)
+        } else {
+            alternate = null
+        }
+        return evaluateIfStatement(test, consequent, alternate)
     },
 
     ExpressionStatement: function*(node: es.ExpressionStatement, context: Context) {
@@ -480,7 +502,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     BlockStatement: function*(node: es.BlockStatement, context: Context) {
-        throw new Error("Block statements not supported in x-slang");
+        const result = yield* evaluateBlockSatement(context, node)
+        return result
     },
 
     ImportDeclaration: function*(node: es.ImportDeclaration, context: Context) {

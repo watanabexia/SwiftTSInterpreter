@@ -35,7 +35,9 @@ import {
   LogicalAndContext,
   LogicalNotContext,
   StringContext,
-  DeclareValueStatContext
+  DeclareValueStatContext,
+  IfStatementContext,
+  BlockStatContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -193,7 +195,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
-
+  
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expr())
   }
@@ -475,6 +477,31 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       `invalid syntax ${node.text}`
     )
   }
+
+  visitIfStatement(ctx: IfStatementContext): es.Statement {
+    const generator = new ExpressionGenerator()
+    let alternative;
+    if (ctx._alternate == undefined) {
+      alternative = null
+    } else {
+      alternative = this.visit(ctx._alternate)
+    }
+    return {
+      alternate: alternative,
+      consequent: this.visit(ctx._consequent),
+      loc: contextToLocation(ctx),
+      test: ctx._test.accept(generator),
+      type: "IfStatement"
+    }
+  }
+
+  visitBlockStat(ctx: BlockStatContext): es.Statement {
+    return {
+      body: [this.visit(ctx._body)],
+      loc: contextToLocation(ctx),
+      type: "BlockStatement"
+    }
+  }
 }
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
@@ -562,14 +589,13 @@ export function parse(source: string, context: Context) {
 
       //Debug
       // console.log('ANTLR AST Detected!')
-      console.log(tree.toStringTree(parser))
+      // console.log(tree.toStringTree(parser))
 
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
 
       //Debug
       console.log('ESTree AST:')
       console.log(program)
-      // console.log(program['body'][2]['expression'])
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
         //Debug
