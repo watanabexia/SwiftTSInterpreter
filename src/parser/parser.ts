@@ -30,7 +30,9 @@ import {
   ModuloContext,
   LogicalOrContext,
   LogicalAndContext,
-  LogicalNotContext
+  LogicalNotContext,
+  IfStatementContext,
+  BlockStatContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -405,6 +407,31 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       },
       `invalid syntax ${node.text}`
     )
+  }
+
+  visitIfStatement(ctx: IfStatementContext): es.Statement {
+    const generator = new ExpressionGenerator()
+    let alternative;
+    if (ctx._alternate == undefined) {
+      alternative = null
+    } else {
+      alternative = this.visit(ctx._alternate)
+    }
+    return {
+      alternate: alternative,
+      consequent: this.visit(ctx._consequent),
+      loc: contextToLocation(ctx),
+      test: ctx._test.accept(generator),
+      type: "IfStatement"
+    }
+  }
+
+  visitBlockStat(ctx: BlockStatContext): es.Statement {
+    return {
+      body: [this.visit(ctx._body)],
+      loc: contextToLocation(ctx),
+      type: "BlockStatement"
+    }
   }
 }
 
