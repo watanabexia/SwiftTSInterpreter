@@ -188,6 +188,14 @@ export function evaluateLogicalExpression(operator: LogicalOperator, left: any, 
   }
 }
 
+export function evaluateIfStatement(test: any, consequent: any, alternate: any) {
+  if(test == true) {
+    return consequent
+  } else if (alternate != null) {
+    return alternate
+  }
+}
+
 /**
  * Limitations for current properTailCalls implementation:
  * Obviously, if objects ({}) are reintroduced,

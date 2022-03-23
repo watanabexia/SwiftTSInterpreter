@@ -24,19 +24,30 @@ NUMBER: [0-9]+;
 WHITESPACE: [ \t]+ -> skip;
 NEWLINE: '\r'? '\n';
 SEMICOL: ';' ;
+IF: 'if';
+ELSE: 'else';
 
 /*
  * Productions
  */
 prog: stat+ ;
 
-stat: expression=expr NEWLINE                      # ExprStat
-    | expression=expr SEMICOL NEWLINE              # ExprStat
-    | expression=expr EOF                          # ExprStat
-    | expression=expr SEMICOL EOF                  # ExprStat
-    | NEWLINE                           # EmptStat
-    | NEWLINE EOF                       # EmptStat
+stat_end: NEWLINE
+        | SEMICOL NEWLINE
+        | EOF
+        | SEMICOL EOF
+        ;
+
+stat: expression=expr stat_end                                                      # ExprStat
+    | IF test=expr consequent=block_stat (ELSE alternate=block_stat)? stat_end      # IfStatement
+    | IF test=expr consequent=block_stat (ELSE alternate=stat)? stat_end            # IfStatement
+    | NEWLINE                                                                       # EmptStat
+    | NEWLINE EOF                                                                   # EmptStat
     ;
+
+block_stat: '{' body=stat* '}'                                     # BlockStat
+          | '{\n' body=stat* '}'                                   # BlockStat
+          ;
 
 expr
    : NUMBER                                             # Number
