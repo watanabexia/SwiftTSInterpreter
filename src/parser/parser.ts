@@ -19,6 +19,9 @@ import {
   StatContext,
   SubtractionContext,
   DecimalContext,
+  DeclareStatContext,
+  NameContext,
+  AssignStatContext,
   TrueContext,
   FalseContext,
   EqualContext,
@@ -31,6 +34,8 @@ import {
   LogicalOrContext,
   LogicalAndContext,
   LogicalNotContext,
+  StringContext,
+  DeclareValueStatContext,
   IfStatementContext,
   BlockStatContext
 } from '../lang/CalcParser'
@@ -174,6 +179,23 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
+  visitName(ctx: NameContext): es.Expression {
+    return {
+      type: 'Identifier',
+      name: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitString(ctx: StringContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: ctx.text.slice(1,-1),
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+  
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expr())
   }
@@ -359,13 +381,8 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-// function convertExpression(expression: ExprContext): es.Expression {
-//   const generator = new ExpressionGenerator()
-//   return expression.accept(generator)
-// }
-
 class StatementGenerator implements CalcVisitor<es.Statement> {
-  visitExprStat(ctx: ExprStatContext): es.Statement {
+  visitExprStat(ctx: ExprStatContext): es.ExpressionStatement {
     const generator = new ExpressionGenerator()
     return {
       type: 'ExpressionStatement',
@@ -374,9 +391,61 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 
-  visitEmptStat(ctx: EmptStatContext): es.Statement {
+  visitEmptStat(ctx: EmptStatContext): es.EmptyStatement {
     return {
       type: 'EmptyStatement',
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitDeclareStat(ctx: DeclareStatContext): es.Declaration {
+    return {
+      type: 'VariableDeclaration',
+      declarations: [{
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: <string>ctx._id.text
+        },
+        init: undefined,
+        TYPE: <string>ctx._type.text
+      }],
+      kind: <'var'|'let'>(ctx._declare_type.text),
+      loc: contextToLocation(ctx),
+    }
+  }
+
+  visitDeclareValueStat(ctx: DeclareValueStatContext): es.Declaration {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'VariableDeclaration',
+      declarations: [{
+        type: 'VariableDeclarator',
+        id: {
+          type: 'Identifier',
+          name: <string>ctx._id.text
+        },
+        init: ctx._value.accept(generator),
+        TYPE: 'UNKNOWN'
+      }],
+      kind: <'var'|'let'>(ctx._declare_type.text),
+      loc: contextToLocation(ctx),
+    }
+  }
+
+  visitAssignStat(ctx: AssignStatContext): es.ExpressionStatement {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'ExpressionStatement',
+      expression: {
+        type: 'AssignmentExpression',
+        operator: '=',
+        left: {
+          type: 'Identifier',
+          name: <string>ctx._id.text
+        },
+        right: ctx._value.accept(generator)
+      },
       loc: contextToLocation(ctx)
     }
   }
@@ -434,7 +503,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 }
-
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
     const ESTreeProgram: es.Program = {
@@ -522,7 +590,6 @@ export function parse(source: string, context: Context) {
       //Debug
       // console.log('ANTLR AST Detected!')
       // console.log(tree.toStringTree(parser))
-      console.log(tree.toStringTree(parser))
 
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
 

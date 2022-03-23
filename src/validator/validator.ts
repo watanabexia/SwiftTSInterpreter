@@ -14,11 +14,13 @@ export function validateAndAnnotate(
 ): TypeAnnotatedNode<es.Program> {
   const accessedBeforeDeclarationMap = new Map<es.Node, Map<string, Declaration>>()
   const scopeHasCallExpressionMap = new Map<es.Node, boolean>()
+
   function processBlock(node: es.Program | es.BlockStatement) {
     const initialisedIdentifiers = new Map<string, Declaration>()
     scopeHasCallExpressionMap.set(node, false)
     accessedBeforeDeclarationMap.set(node, initialisedIdentifiers)
   }
+
   function processFunction(node: es.FunctionDeclaration | es.ArrowFunctionExpression) {
     accessedBeforeDeclarationMap.set(
       node,
@@ -28,6 +30,10 @@ export function validateAndAnnotate(
   }
 
   // initialise scope of variables
+  /* There are four kinds of scopes, for each scope it will initialize two Maps. 
+     For program and block, the two Maps are empty.
+     For functions, the parameters are initialized as NOT accessed before declaration. 
+  */
   ancestor(program as es.Node, {
     Program: processBlock,
     BlockStatement: processBlock,
@@ -35,6 +41,10 @@ export function validateAndAnnotate(
     ArrowFunctionExpression: processFunction,
     ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
   })
+
+  //Debug
+  console.log("HERE!")
+  console.log(accessedBeforeDeclarationMap)
 
   function validateIdentifier(id: es.Identifier, ancestors: es.Node[]) {
     const name = id.name
@@ -56,12 +66,22 @@ export function validateAndAnnotate(
       }
     }
   }
+
+  //Debug
+  console.log("HERE!")
+
   ancestor(
     program,
     {
       VariableDeclaration(node: TypeAnnotatedNode<es.VariableDeclaration>, ancestors: es.Node[]) {
         const lastAncestor = ancestors[ancestors.length - 2]
         const name = getVariableDecarationName(node)
+
+        //Debug
+        console.log(lastAncestor)
+        console.log(name)
+        console.log(accessedBeforeDeclarationMap)
+
         const accessedBeforeDeclaration = accessedBeforeDeclarationMap.get(lastAncestor)!.get(name)!
           .accessedBeforeDeclaration
         node.typability = accessedBeforeDeclaration ? 'Untypable' : 'NotYetTyped'

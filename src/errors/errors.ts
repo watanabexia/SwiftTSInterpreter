@@ -251,3 +251,39 @@ export class SetPropertyError extends RuntimeSourceError {
     return 'TODO'
   }
 }
+
+export class TypeAssignmentError extends RuntimeSourceError {
+  constructor(node: es.Node, private name: string, private i_type: string, private v_type: string) {
+    super(node)
+  }
+
+  public explain() {
+
+    return `Cannot assign value of type '${this.v_type}' to type '${this.i_type}'.`
+  }
+
+  public elaborate() {
+    return `As ${this.name} was declared as of type '${this.i_type}', you cannot assign a value of other types to it.`
+  }
+}
+
+export class UndefinedError extends RuntimeSourceError {
+  kind: string
+
+  constructor(node: es.Node, private name: string, private value: any) {
+    super(node)
+    if (this.value['mutable']) {
+      this.kind = 'Variable'
+    } else {
+      this.kind = 'Constant'
+    }
+  }
+
+  public explain() {
+    return `${this.kind} '${this.name}' used before initialized.`
+  }
+
+  public elaborate() {
+    return `As ${this.name} was declared with a type but you haven't assigned a value to it.`
+  }
+}

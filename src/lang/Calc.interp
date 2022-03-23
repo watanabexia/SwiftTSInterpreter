@@ -1,8 +1,15 @@
 token literal names:
 null
-'.'
+':'
+','
+'{'
+'}'
+'{\n'
+'='
 '('
 ')'
+'->'
+'.'
 '^'
 '*'
 '/'
@@ -14,8 +21,26 @@ null
 null
 null
 ';'
+null
+'let'
+'var'
+'Int'
+'Double'
+'Bool'
+'String'
+'func'
+'return'
+null
+null
 
 token symbolic names:
+null
+null
+null
+null
+null
+null
+null
 null
 null
 null
@@ -31,9 +56,26 @@ NUMBER
 WHITESPACE
 NEWLINE
 SEMICOL
+LINE_COMMENT
+LET
+VAR
+INT
+DOUBLE
+BOOL
+STRING
+FUNC
+RTN
+ID
+STR
 
 rule names:
 prog
+stat_end
+types
+declare_types
+arg_type
+arg_value
+block_stat
 stat
 expr
 

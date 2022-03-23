@@ -48,6 +48,7 @@ export class CalcLexer extends Lexer {
 		"'false'", undefined, undefined, undefined, "';'",
 	];
 	private static readonly _SYMBOLIC_NAMES: Array<string | undefined> = [
+		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
 		undefined, undefined, undefined, undefined, "POW", "MUL", "DIV", "ADD", 
 		"SUB", "TRUE", "FALSE", "NUMBER", "WHITESPACE", "NEWLINE", "SEMICOL",
 	];

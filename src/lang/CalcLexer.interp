@@ -1,8 +1,15 @@
 token literal names:
 null
-'.'
+':'
+','
+'{'
+'}'
+'{\n'
+'='
 '('
 ')'
+'->'
+'.'
 '^'
 '*'
 '/'
@@ -14,12 +21,30 @@ null
 null
 null
 ';'
+null
+'let'
+'var'
+'Int'
+'Double'
+'Bool'
+'String'
+'func'
+'return'
+null
+null
 
 token symbolic names:
 null
 null
 null
 null
+null
+null
+null
+null
+null
+null
+null
 POW
 MUL
 DIV
@@ -31,11 +56,29 @@ NUMBER
 WHITESPACE
 NEWLINE
 SEMICOL
+LINE_COMMENT
+LET
+VAR
+INT
+DOUBLE
+BOOL
+STRING
+FUNC
+RTN
+ID
+STR
 
 rule names:
 T__0
 T__1
 T__2
+T__3
+T__4
+T__5
+T__6
+T__7
+T__8
+T__9
 POW
 MUL
 DIV
@@ -47,6 +90,17 @@ NUMBER
 WHITESPACE
 NEWLINE
 SEMICOL
+LINE_COMMENT
+LET
+VAR
+INT
+DOUBLE
+BOOL
+STRING
+FUNC
+RTN
+ID
+STR
 
 channel names:
 DEFAULT_TOKEN_CHANNEL
