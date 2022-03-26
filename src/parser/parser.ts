@@ -37,7 +37,12 @@ import {
   StringContext,
   DeclareValueStatContext,
   IfStatementContext,
-  BlockStatContext
+  FuncDeclareStatContext,
+  Arg_typeContext,
+  ReturnStatContext,
+  BlockStatContext,
+  FuncCallContext,
+  Arg_valueContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -143,7 +148,7 @@ function contextToLocation(ctx: ExprContext): es.SourceLocation {
   }
 }
 class ExpressionGenerator implements CalcVisitor<es.Expression> {
-  visitNumber(ctx: NumberContext): es.Expression {
+  visitNumber(ctx: NumberContext): es.Literal {
     return {
       type: 'Literal',
       value: parseInt(ctx.text),
@@ -152,7 +157,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitDecimal(ctx: DecimalContext): es.Expression {
+  visitDecimal(ctx: DecimalContext): es.Literal {
     return {
       type: 'Literal',
       value: parseFloat(ctx.text),
@@ -161,7 +166,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitTrue(ctx: TrueContext): es.Expression {
+  visitTrue(ctx: TrueContext): es.Literal {
     return {
       type: 'Literal',
       value: true,
@@ -170,7 +175,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitFalse(ctx: FalseContext): es.Expression {
+  visitFalse(ctx: FalseContext): es.Literal {
     return {
       type: 'Literal',
       value: false,
@@ -179,7 +184,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitName(ctx: NameContext): es.Expression {
+  visitName(ctx: NameContext): es.Identifier {
     return {
       type: 'Identifier',
       name: ctx.text,
@@ -187,10 +192,10 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitString(ctx: StringContext): es.Expression {
+  visitString(ctx: StringContext): es.Literal {
     return {
       type: 'Literal',
-      value: ctx.text.slice(1,-1),
+      value: ctx.text.slice(1, -1),
       raw: ctx.text,
       loc: contextToLocation(ctx)
     }
@@ -344,6 +349,26 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
+  visitFuncCall(ctx: FuncCallContext): es.CallExpression {
+    const id_generator = new IdentifierGenerator()
+    const ESTreeCallExpression: es.CallExpression = {
+      type: 'CallExpression',
+      callee: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      arguments: [],
+      loc: contextToLocation(ctx),
+      optional: false
+    }
+
+    for (let i = 0; i < ctx.arg_value().length; i++) {
+      ESTreeCallExpression.arguments.push(ctx.arg_value(i).accept(id_generator))
+    }
+
+    return ESTreeCallExpression
+  }
+
   visitExpression?: ((ctx: ExprContext) => es.Expression) | undefined
   visitStart?: ((ctx: StatContext) => es.Expression) | undefined
 
@@ -381,6 +406,56 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
+class IdentifierGenerator implements CalcVisitor<es.Identifier> {
+  
+  visitArg_type(ctx: Arg_typeContext): es.Identifier {
+    return {
+      type: 'Identifier',
+      name: <string>ctx._id.text,
+      TYPE: ctx._type.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitArg_value(ctx: Arg_valueContext): es.Identifier {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'Identifier',
+      name: <string>ctx._id.text,
+      VALUE: ctx._value.accept(generator),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visit(tree: ParseTree): es.Identifier {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.Identifier {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.Identifier {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.Identifier {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
+} 
+
 class StatementGenerator implements CalcVisitor<es.Statement> {
   visitExprStat(ctx: ExprStatContext): es.ExpressionStatement {
     const generator = new ExpressionGenerator()
@@ -401,17 +476,19 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
   visitDeclareStat(ctx: DeclareStatContext): es.Declaration {
     return {
       type: 'VariableDeclaration',
-      declarations: [{
-        type: 'VariableDeclarator',
-        id: {
-          type: 'Identifier',
-          name: <string>ctx._id.text
-        },
-        init: undefined,
-        TYPE: <string>ctx._type.text
-      }],
-      kind: <'var'|'let'>(ctx._declare_type.text),
-      loc: contextToLocation(ctx),
+      declarations: [
+        {
+          type: 'VariableDeclarator',
+          id: {
+            type: 'Identifier',
+            name: <string>ctx._id.text
+          },
+          init: undefined,
+          TYPE: <string>ctx._type.text
+        }
+      ],
+      kind: <'var' | 'let'>ctx._declare_type.text,
+      loc: contextToLocation(ctx)
     }
   }
 
@@ -419,17 +496,19 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     const generator = new ExpressionGenerator()
     return {
       type: 'VariableDeclaration',
-      declarations: [{
-        type: 'VariableDeclarator',
-        id: {
-          type: 'Identifier',
-          name: <string>ctx._id.text
-        },
-        init: ctx._value.accept(generator),
-        TYPE: 'UNKNOWN'
-      }],
-      kind: <'var'|'let'>(ctx._declare_type.text),
-      loc: contextToLocation(ctx),
+      declarations: [
+        {
+          type: 'VariableDeclarator',
+          id: {
+            type: 'Identifier',
+            name: <string>ctx._id.text
+          },
+          init: ctx._value.accept(generator),
+          TYPE: 'UNKNOWN'
+        }
+      ],
+      kind: <'var' | 'let'>ctx._declare_type.text,
+      loc: contextToLocation(ctx)
     }
   }
 
@@ -444,8 +523,42 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
           type: 'Identifier',
           name: <string>ctx._id.text
         },
-        right: ctx._value.accept(generator)
+        right: ctx._value.accept(generator),
+        loc: contextToLocation(ctx)
       },
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitFuncDeclareStat(ctx: FuncDeclareStatContext): es.FunctionDeclaration {
+    const blk_generator = new BlockStatementGenerator()
+    const ESTreeFunctionDeclaration: es.FunctionDeclaration = {
+      type: 'FunctionDeclaration',
+      id: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      params: [],
+      body: ctx._body.accept(blk_generator),
+      loc: contextToLocation(ctx)
+    }
+
+    //Debug
+    console.log("BODY DONE")
+
+    const arg_generator = new IdentifierGenerator()
+    for (let i = 0; i < ctx.arg_type().length; i++) {
+      ESTreeFunctionDeclaration.params.push(ctx.arg_type(i).accept(arg_generator))
+    }
+
+    return ESTreeFunctionDeclaration
+  }
+
+  visitReturnStat(ctx: ReturnStatContext): es.ReturnStatement {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'ReturnStatement',
+      argument: ctx._value.accept(generator),
       loc: contextToLocation(ctx)
     }
   }
@@ -503,6 +616,52 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 }
+
+class BlockStatementGenerator implements CalcVisitor<es.BlockStatement> {
+  visitBlockStat(ctx: BlockStatContext): es.BlockStatement {
+    const ESTreeBlockStatement: es.BlockStatement = {
+      type: 'BlockStatement',
+      body: [],
+      loc: contextToLocation(ctx)
+    }
+
+    const generator = new StatementGenerator()
+    for (let i = 0; i < ctx.stat().length; i++) {
+      ESTreeBlockStatement.body.push(ctx.stat(i).accept(generator))
+    }
+
+    return ESTreeBlockStatement
+  }
+
+  visit(tree: ParseTree): es.BlockStatement {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.BlockStatement {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.BlockStatement {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.BlockStatement {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
+}
+
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
     const ESTreeProgram: es.Program = {
@@ -561,19 +720,6 @@ function convertProgram(prog: ProgContext): es.Program {
   const generator = new ProgramGenerator()
   return prog.accept(generator)
 }
-
-// function convertSource(expr: ExprContext): es.Program {
-//   return {
-//     type: 'Program',
-//     sourceType: 'script',
-//     body: [
-//       {
-//         type: 'ExpressionStatement',
-//         expression: convertExpression(expr)
-//       }
-//     ]
-//   }
-// }
 
 export function parse(source: string, context: Context) {
   let program: es.Program | undefined

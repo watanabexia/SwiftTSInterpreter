@@ -4,13 +4,13 @@ import * as constants from '../constants'
 import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
-import { primitive } from '../utils/astCreator'
 import {
     evaluateBinaryExpression,
     evaluateIfStatement,
     evaluateLogicalExpression,
     evaluateUnaryExpression
 } from '../utils/operators'
+// import { primitive } from '../utils/astCreator'
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
 
@@ -60,20 +60,43 @@ const createEnvironment = (
   callExpression?: es.CallExpression
 ): Environment => {
   const environment: Environment = {
-    name: closure.functionName, // TODO: Change this
+    name: closure.functionName,
     tail: closure.environment,
     head: {}
   }
   if (callExpression) {
     environment.callExpression = {
       ...callExpression,
-      arguments: args.map(primitive)
+      // arguments: args.map(primitive)
     }
   }
   closure.node.params.forEach((param, index) => {
     const ident = param as es.Identifier
     environment.head[ident.name] = args[index]
   })
+  return environment
+}
+
+const createFunctionEnvironment = (
+  functionName: string,
+  arg_ids: Value[],
+  args: Value[],
+  context: Context
+): Environment => {
+  const environment: Environment = {
+    name: functionName,
+    tail: currentEnvironment(context),
+    head: {}
+  }
+
+  //Debug
+  // console.log("CREATE FUNC ENV")
+  // console.log(arg_ids)
+  // console.log(args)
+  
+  for (let i = 0; i < arg_ids.length; i++) {
+    environment.head[arg_ids[i].name] = args[i].VALUE
+  }
   return environment
 }
 
@@ -100,8 +123,8 @@ const handleRuntimeError = (context: Context, error: RuntimeSourceError): never 
 const DECLARED_BUT_NOT_YET_ASSIGNED = Symbol('Used to implement hoisting')
 
 function get_type(value: any) {
-  let v_type = ""
-  switch (typeof(value)) {
+  let v_type = ''
+  switch (typeof value) {
     case 'number':
       if (value % 1 === 0) {
         v_type = 'Int'
@@ -160,11 +183,14 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
 function assignVariables(context: Context, name: string, value: any, node: es.Node) {
   const environment = currentEnvironment(context)
   if (environment.head.hasOwnProperty(name)) {
-    if (typeof(environment.head[name]) !== 'symbol') {
-      let v_type = get_type(value)
+    if (typeof environment.head[name] !== 'symbol') {
+      const v_type = get_type(value)
       const i_type = environment.head[name]['TYPE']
       if (v_type !== i_type) {
-        return handleRuntimeError(context, new errors.TypeAssignmentError(node, name, i_type, v_type))
+        return handleRuntimeError(
+          context,
+          new errors.TypeAssignmentError(node, name, i_type, v_type)
+        )
       }
 
       const i_mutable = environment.head[name]['mutable']
@@ -174,31 +200,37 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
       }
 
       environment.head[name]['value'] = value
-
-    } else { // First-time initialization
+    } else {
+      // First-time initialization
       environment.head[name] = value
     }
   } else {
     return handleRuntimeError(context, new errors.UndefinedVariable(name, node))
   }
-  
+
   return environment
 }
 
 function evaluateIdentifier(context: Context, name: string, node: es.Node) {
   const environment = currentEnvironment(context)
   if (environment.head.hasOwnProperty(name)) {
-
     //Debug
     // console.log(environment.head[name])
 
-    if (typeof(environment.head[name]) === "symbol") {
+    if (typeof environment.head[name] === 'symbol') {
       return handleRuntimeError(context, new errors.UnassignedVariable(name, node))
     } else {
       if (environment.head[name]['value'] === undefined) {
-        return handleRuntimeError(context, new errors.UndefinedError(node, name, environment.head[name]))
+        return handleRuntimeError(
+          context,
+          new errors.UndefinedError(node, name, environment.head[name])
+        )
       } else {
-        return environment.head[name]['value']
+        if (environment.head[name]['TYPE'] == 'Function') {
+          return environment.head[name]
+        } else {
+          return environment.head[name]['value']
+        }
       }
     }
   } else {
@@ -250,7 +282,6 @@ const checkNumberOfArguments = (
 export type Evaluator<T extends es.Node> = (node: T, context: Context) => IterableIterator<Value>
 
 function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
-
   //Debug
   // console.log("[Block] start eval statements")
 
@@ -261,7 +292,6 @@ function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
 
   let result
   for (const statement of node.body) {
-
     //Debug
     // console.log("[Block] eval statement")
 
@@ -270,8 +300,9 @@ function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
     //Debug
     // console.log(result)
 
-    if (
-      result instanceof ReturnValue ||
+    if (result instanceof ReturnValue) {
+      return result.value
+    } else if (
       result instanceof TailCallReturnValue ||
       result instanceof BreakValue ||
       result instanceof ContinueValue
@@ -337,7 +368,27 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     CallExpression: function*(node: es.CallExpression, context: Context) {
-        throw new Error("Call expressions not supported in x-slang");
+        //Debug
+        // console.log("CALL!!")
+        
+        const callee_name = (<es.Identifier>node.callee).name
+        const callee = yield* evaluate(node.callee, context)
+        const args = node.arguments
+        
+        //Debug
+        // console.log(callee)
+
+        let env = createFunctionEnvironment(callee_name, callee.params, args, context)
+        pushEnvironment(context, env)
+
+        //Debug
+        // console.log(currentEnvironment(context))
+
+        const result = yield* evaluate(callee.value, context)
+        popEnvironment(context)
+
+        return result
+        // throw new Error("Call expressions not supported in x-slang");
     },
 
     NewExpression: function*(node: es.NewExpression, context: Context) {
@@ -470,7 +521,22 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     FunctionDeclaration: function*(node: es.FunctionDeclaration, context: Context) {
-        throw new Error("Function declarations not supported in x-slang");
+        //Debug
+        console.log("FUNC DECLARE")
+        
+        const name = (<es.Identifier>node.id).name
+        const real_value = {
+          "type": "BlockStatement",
+          "mutable": false,
+          "TYPE": "Function",
+          "params": node.params,
+          "value": node.body
+        }
+
+        assignVariables(context, name, real_value, node);
+
+        return null;
+        // throw new Error("Function declarations not supported in x-slang");
     },
 
     IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
@@ -490,7 +556,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
-        throw new Error("Return statements not supported in x-slang");
+
+        let result = yield* evaluate(<es.Expression>node.argument, context)
+        return new ReturnValue(result)
+        // throw new Error("Return statements not supported in x-slang");
     },
 
     WhileStatement: function*(node: es.WhileStatement, context: Context) {
@@ -537,8 +606,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
 export function* evaluate(node: es.Node, context: Context) {
   //Debug
-  // console.log("Evaluating...")
-  // console.log(node)
+  console.log("Evaluating...")
+  console.log(node)
+  console.log(">>>>>>>>>>")
 
   yield* visit(context, node)
   const result = yield* evaluators[node.type](node, context)

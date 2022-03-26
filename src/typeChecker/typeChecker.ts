@@ -72,27 +72,37 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
       traverse(node.expression, constraints)
       break
     }
-    case 'BlockStatement':
-      throw Error('Block statements not supported for x-slang')
+    case 'BlockStatement': {
+      node.body.forEach(nodeBody => {
+        traverse(nodeBody, constraints)
+      })
+      break
+    }
     case 'WhileStatement':
       throw Error('While statements not supported for x-slang')
     case 'ForStatement':
       throw Error('For statements not supported for x-slang')
     case 'ConditionalExpression': // both cases are the same
-    case 'IfStatement':
-      throw Error('If statements not supported for x-slang')
-    case 'CallExpression':
-      throw Error('Call statements not supported for x-slang')
-    case 'ReturnStatement':
-      throw Error('Return statements not supported for x-slang')
-    case 'VariableDeclaration':
-      throw Error('Variable statements not supported for x-slang')
+    case 'IfStatement': {
+      break
+    }
+    case 'CallExpression': {
+      break
+    }
+    case 'ReturnStatement': {
+      break
+    }
+    case 'VariableDeclaration': {
+      break
+    }
     case 'ArrowFunctionExpression':
       throw Error('Arrow functions not supported for x-slang')
-    case 'FunctionDeclaration':
-      throw Error('Function declarations  not supported for x-slang')
-    case 'AssignmentExpression':
-      throw Error('Assignments expressions not supported for x-slang')
+    case 'FunctionDeclaration': {
+      break
+    }
+    case 'AssignmentExpression': {
+      break
+    }
     case 'ArrayExpression':
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression':

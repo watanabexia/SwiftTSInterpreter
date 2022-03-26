@@ -123,3 +123,27 @@ export class InvalidArgumentTypesError implements SourceError {
     return this.explain()
   }
 }
+
+export class ParseUnfoundError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public id: string
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Cannot find '${this.id}' in the scope.
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}

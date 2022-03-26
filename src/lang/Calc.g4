@@ -86,9 +86,6 @@ stat: expression=expr stat_end                                                  
     | NEWLINE EOF                                                                       # EmptStat
     ;
 
-block_stat: '{' body=stat* '}'                                     # BlockStat
-          | '{\n' body=stat* '}'                                   # BlockStat
-          ;
 
 expr
    : ID                                                 # Name
