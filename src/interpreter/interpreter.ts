@@ -7,7 +7,6 @@ import { Context, Environment, Frame, Value } from '../types'
 import { primitive } from '../utils/astCreator'
 import {
     evaluateBinaryExpression,
-    evaluateIfStatement,
     evaluateLogicalExpression,
     evaluateUnaryExpression
 } from '../utils/operators'
@@ -475,14 +474,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
         const test = yield* actualValue(node.test, context)
-        const consequent = yield* actualValue(node.consequent, context)
-        let alternate;
-        if(node.alternate != null) {
-            alternate = yield* actualValue(node.alternate, context)
+        let result;
+        if (test == true ) {
+            result = yield* evaluate(node.consequent, context);
+        } else if (node.alternate != null) {
+            result = yield* evaluate(node.alternate, context);
         } else {
-            alternate = null
+            result = null
         }
-        return evaluateIfStatement(test, consequent, alternate)
+        return result;
     },
 
     ExpressionStatement: function*(node: es.ExpressionStatement, context: Context) {

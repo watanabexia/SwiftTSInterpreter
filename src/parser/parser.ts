@@ -496,13 +496,21 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
   }
 
   visitBlockStat(ctx: BlockStatContext): es.Statement {
-    return {
-      body: [this.visit(ctx._body)],
+    const ESTreeProgram: es.Statement = {
+      body: [],
       loc: contextToLocation(ctx),
       type: "BlockStatement"
     }
+
+    const generator = new StatementGenerator()
+    for (let i = 0; i < ctx.stat().length; i++) {
+      ESTreeProgram.body.push(ctx.stat(i).accept(generator))
+    }
+
+    return ESTreeProgram
   }
 }
+
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
     const ESTreeProgram: es.Program = {
