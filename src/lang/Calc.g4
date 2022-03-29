@@ -37,10 +37,10 @@ STRING: 'String';
 FUNC: 'func';
 RTN: 'return';
 
-ID: [a-zA-Z_] [a-zA-Z0-9_]*;
-STR: '"' ~[\r\n]* '"';
 IF: 'if';
 ELSE: 'else';
+ID: [a-zA-Z_] [a-zA-Z0-9_]*;
+STR: '"' ~[\r\n]* '"';
 
 /*
  * Productions
@@ -75,8 +75,8 @@ block_stat: '{' body=stat* '}'                                     # BlockStat
           ;
 
 stat: expression=expr stat_end                                                          # ExprStat
-    | IF test=expr consequent=block_stat (ELSE alternate=block_stat)? stat_end          # IfStatement
-    | IF test=expr consequent=block_stat (ELSE alternate=stat)? stat_end                # IfStatement
+    | IF test=expr consequent=block_stat (ELSE alternate=block_stat)? stat_end?         # IfStatement
+    | IF test=expr consequent=block_stat (ELSE alternate=stat)? stat_end?               # IfStatement
     | declare_type=declare_types id=ID ':' type=types stat_end                          # DeclareStat
     | declare_type=declare_types id=ID '=' value=expr stat_end                          # DeclareValueStat
     | id=ID '=' value=expr stat_end                                                     # AssignStat
