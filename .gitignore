@@ -1,4 +1,10 @@
-node_modules
+node_modules/*
+!node_modules/@types/
+node_modules/@types/*
+!node_modules/@types/estree
+node_modules/@types/estree/*
+!node_modules/@types/estree/index.d.ts
+
 *.js
 !docs/jsdoc/templates/**/*.js
 !docs/lib/**/*.js

@@ -2,6 +2,7 @@ import { ancestor, base, FullWalkerCallback } from '../utils/walkers'
 import * as es from 'estree'
 import { Context, TypeAnnotatedNode } from '../types'
 import { getVariableDecarationName } from '../utils/astCreator'
+import { ParseMissingReturnError, ParseUnexpectedReturnError, ParseUnfoundError } from '../errors/typeErrors'
 
 class Declaration {
   public accessedBeforeDeclaration: boolean = false
@@ -12,20 +13,34 @@ export function validateAndAnnotate(
   program: es.Program,
   context: Context
 ): TypeAnnotatedNode<es.Program> {
-  const accessedBeforeDeclarationMap = new Map<es.Node, Map<string, Declaration>>()
+  // const accessedBeforeDeclarationMap = new Map<es.Node, Map<string, Declaration>>()
+  const DeclarationMap = new Map<es.Node, Map<string, Declaration>>()
   const scopeHasCallExpressionMap = new Map<es.Node, boolean>()
 
   function processBlock(node: es.Program | es.BlockStatement) {
     const initialisedIdentifiers = new Map<string, Declaration>()
     scopeHasCallExpressionMap.set(node, false)
-    accessedBeforeDeclarationMap.set(node, initialisedIdentifiers)
+    DeclarationMap.set(node, initialisedIdentifiers)
+    // accessedBeforeDeclarationMap.set(node, initialisedIdentifiers)
   }
 
   function processFunction(node: es.FunctionDeclaration | es.ArrowFunctionExpression) {
-    accessedBeforeDeclarationMap.set(
+    DeclarationMap.set(
       node,
-      new Map((node.params as es.Identifier[]).map(id => [id.name, new Declaration(false)]))
+      new Map((node.params as es.Identifier[]).map(id => [id.name, new Declaration(true)]))
     )
+    DeclarationMap.get(node)?.set((<es.FunctionDeclaration>node).id!.name, new Declaration(true))
+
+    //Debug
+    // console.log("P FUNC VALID")
+    // console.log(node)
+    // console.log(DeclarationMap.get(node))
+
+    // accessedBeforeDeclarationMap.set(
+    //   node,
+    //   new Map((node.params as es.Identifier[]).map(id => [id.name, new Declaration(false)]))
+    // )
+
     scopeHasCallExpressionMap.set(node, false)
   }
 
@@ -42,21 +57,68 @@ export function validateAndAnnotate(
     ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
   })
 
-  //Debug
-  console.log("HERE!")
-  console.log(accessedBeforeDeclarationMap)
-
-  function validateIdentifier(id: es.Identifier, ancestors: es.Node[]) {
+  function validateIdentifier(id: es.Identifier, ancestors: TypeAnnotatedNode<es.Node>[]) {
     const name = id.name
+    let Found = false
+
+    //Debug
+    // console.log('VALID ID')
+
     for (let i = ancestors.length - 1; i >= 0; i--) {
       const a = ancestors[i]
-      const map = accessedBeforeDeclarationMap.get(a)
+      const map = DeclarationMap.get(a)
+
+      //Debug
+      // console.log('VALID ID - SUB')
+      // console.log(a)
+      // console.log(map)
+
       if (map?.has(name)) {
-        map.get(name)!.accessedBeforeDeclaration = true
-        break
+        Found = true
+      }
+      // const map = accessedBeforeDeclarationMap.get(a)
+      // if (map?.has(name)) {
+      //   map.get(name)!.accessedBeforeDeclaration = true
+      //   break
+      // }
+    }
+    if (!Found) {
+      //Debug
+      // console.log("VALID ERROR UNFOUND")
+
+      context.errors.push(new ParseUnfoundError(ancestors[ancestors.length - 1], name))
+    } else {
+      // ancestors[ancestors.length - 1].typability = 'NotYetTyped'
+    }
+  }
+
+  function getReturnStatement(node: es.Node): es.ReturnStatement | null {
+    switch (node.type) {
+      case 'IfStatement': {
+        return getReturnStatement(node.consequent) || getReturnStatement(node.alternate!)
+      }
+      case 'BlockStatement': {
+        for (let i = 0; i < node.body.length; i++) {
+          const result = getReturnStatement(node.body[i])
+          if (result !== null) {
+            return result
+          }
+        }
+        return null
+      }
+      case 'ForStatement':
+      case 'WhileStatement': {
+        return getReturnStatement(node.body)
+      }
+      case 'ReturnStatement': {
+        return node
+      }
+      default: {
+        return null
       }
     }
   }
+
   const customWalker = {
     ...base,
     VariableDeclarator(node: es.VariableDeclarator, st: never, c: FullWalkerCallback<never>) {
@@ -64,36 +126,65 @@ export function validateAndAnnotate(
       if (node.init) {
         c(node.init, st, 'Expression')
       }
+    },
+    CallExpression(node: es.CallExpression, st: never, c: FullWalkerCallback<never>) {
+      // don't visit the argument ids
+      if (node.callee) {
+        c(node.callee, st, 'Identifier')
+      }
+      if (node.arguments) {
+        for (let i = 0; i < node.arguments.length; i++) {
+          c(node.arguments[i].VALUE!, st, node.arguments[i].VALUE!.type)
+        }
+      }
     }
   }
 
   //Debug
-  console.log("HERE!")
+  // console.log("VALIDATE HERE")
 
   ancestor(
     program,
     {
       VariableDeclaration(node: TypeAnnotatedNode<es.VariableDeclaration>, ancestors: es.Node[]) {
+        // Update available token
         const lastAncestor = ancestors[ancestors.length - 2]
         const name = getVariableDecarationName(node)
+        DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
+        // node.typability = 'NotYetTyped'
 
-        //Debug
-        console.log(lastAncestor)
-        console.log(name)
-        console.log(accessedBeforeDeclarationMap)
-
-        const accessedBeforeDeclaration = accessedBeforeDeclarationMap.get(lastAncestor)!.get(name)!
-          .accessedBeforeDeclaration
-        node.typability = accessedBeforeDeclaration ? 'Untypable' : 'NotYetTyped'
+        // const accessedBeforeDeclaration = accessedBeforeDeclarationMap.get(lastAncestor)!.get(name)!
+        //   .accessedBeforeDeclaration
+        // node.typability = accessedBeforeDeclaration ? 'Untypable' : 'NotYetTyped'
       },
       Identifier: validateIdentifier,
       FunctionDeclaration(node: TypeAnnotatedNode<es.FunctionDeclaration>, ancestors: es.Node[]) {
         // a function declaration can be typed if there are no function calls in the same scope before it
+  
+        // Update available token
         const lastAncestor = ancestors[ancestors.length - 2]
+        const name = node.id!.name
+        DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
+
+        // Check Return Statement
+        const node_RTN = getReturnStatement(node.body)
+        if (node.TYPE === null) {
+          if (node_RTN !== null) {
+            context.errors.push(new ParseUnexpectedReturnError(node_RTN))
+          }
+        } else {
+          if (node_RTN !== null) {
+          } else {
+            context.errors.push(new ParseMissingReturnError(node, node.TYPE))
+          }
+        }
+
         node.typability = scopeHasCallExpressionMap.get(lastAncestor) ? 'Untypable' : 'NotYetTyped'
       },
-      Pattern(node: es.Pattern, ancestors: es.Node[]) {},
-      CallExpression(call: es.CallExpression, ancestors: es.Node[]) {
+      CallExpression(call: TypeAnnotatedNode<es.CallExpression>, ancestors: es.Node[]) {
+        //Debug
+        // console.log(call)
+
         for (let i = ancestors.length - 1; i >= 0; i--) {
           const a = ancestors[i]
           if (scopeHasCallExpressionMap.has(a)) {
@@ -101,7 +192,21 @@ export function validateAndAnnotate(
             break
           }
         }
-      }
+
+        // call.typability = 'NotYetTyped'
+      },
+      // Literal(node: TypeAnnotatedNode<es.Literal>, ancestors: es.Node[]) {
+      //   node.typability = 'NotYetTyped'
+      // },
+      // Expression(node: TypeAnnotatedNode<es.Expression>, ancestors: es.Node[]) {
+      //   node.typability = 'NotYetTyped'
+      // },
+      // Statement(node: TypeAnnotatedNode<es.Statement>, ancestors: es.Node[]) {
+      //   node.typability = 'NotYetTyped'
+      // },
+      // Program(node: TypeAnnotatedNode<es.Program>, ancestors: es.Node[]) {
+      //   node.typability = 'NotYetTyped'
+      // }
     },
     customWalker
   )

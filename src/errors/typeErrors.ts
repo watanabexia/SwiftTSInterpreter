@@ -58,6 +58,29 @@ export class DifferentNumberArgumentsError implements SourceError {
   }
 }
 
+export class IncorrectArgumentsLabelError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public ExpectedArgsLabel: string[],
+    public ReceivedLabel: string[]
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return `Incorrect argument labels in call (have '${this.ExpectedArgsLabel}', expected '${this.ReceivedLabel}')`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
 export class InvalidArgumentTypesError implements SourceError {
   public type = ErrorType.TYPE
   public severity = ErrorSeverity.WARNING
@@ -116,6 +139,111 @@ export class InvalidArgumentTypesError implements SourceError {
       ${functionString}
     The function expected ${formatPhrasing(this.expectedTypes)}
     but instead received ${formatPhrasing(this.receivedTypes)}
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class ParseUnfoundError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(public node: TypeAnnotatedNode<es.Node>, public id: string) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Cannot find '${this.id}' in the scope
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class ParseUnexpectedReturnError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(public node: TypeAnnotatedNode<es.Node>) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Unexpected non-void return value in void function
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class ParseMissingReturnError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(public node: TypeAnnotatedNode<es.Node>, public TYPE: string) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Missing return in function expected to return '${this.TYPE}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class UnknownTypeError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(public node: TypeAnnotatedNode<es.Node>, public TYPE: string) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Cannot find type '${this.TYPE}' in scope
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class AssignmentTypeError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(public node: TypeAnnotatedNode<es.Node>, public left_TYPE: Type, public right_TYPE: Type) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Cannot assign value of type '${typeToString(this.right_TYPE)}' to type '${typeToString(this.left_TYPE)}'
     `
   }
 

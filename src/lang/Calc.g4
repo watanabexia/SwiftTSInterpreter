@@ -80,11 +80,12 @@ stat: expression=expr stat_end                                                  
     | declare_type=declare_types id=ID ':' type=types stat_end                          # DeclareStat
     | declare_type=declare_types id=ID '=' value=expr stat_end                          # DeclareValueStat
     | id=ID '=' value=expr stat_end                                                     # AssignStat
-    | FUNC id=ID '(' argument=arg_type* ')' '->' type=types body=block_stat stat_end    # FuncDeclareStat
+    | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? body=block_stat stat_end # FuncDeclareStat
     | RTN value=expr stat_end                                                           # ReturnStat
     | NEWLINE                                                                           # EmptStat
     | NEWLINE EOF                                                                       # EmptStat
     ;
+
 
 expr
    : ID                                                 # Name
