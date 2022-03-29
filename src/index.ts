@@ -252,7 +252,8 @@ export async function runInContext(
 
   if (context.errors.length > 0) {
     //Debug
-    console.log("failed to parse:")
+    console.log('failed to parse:')
+    
     return resolvedErrorPromise
   }
 

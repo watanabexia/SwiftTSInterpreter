@@ -200,7 +200,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
-  
+
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expr())
   }
@@ -355,7 +355,8 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       type: 'CallExpression',
       callee: {
         type: 'Identifier',
-        name: <string>ctx._id.text
+        name: <string>ctx._id.text,
+        loc: contextToLocation(ctx)
       },
       arguments: [],
       loc: contextToLocation(ctx),
@@ -407,7 +408,6 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
 }
 
 class IdentifierGenerator implements CalcVisitor<es.Identifier> {
-  
   visitArg_type(ctx: Arg_typeContext): es.Identifier {
     return {
       type: 'Identifier',
@@ -454,7 +454,7 @@ class IdentifierGenerator implements CalcVisitor<es.Identifier> {
       `invalid syntax ${node.text}`
     )
   }
-} 
+}
 
 class StatementGenerator implements CalcVisitor<es.Statement> {
   visitExprStat(ctx: ExprStatContext): es.ExpressionStatement {
@@ -481,7 +481,8 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
           type: 'VariableDeclarator',
           id: {
             type: 'Identifier',
-            name: <string>ctx._id.text
+            name: <string>ctx._id.text,
+            loc: contextToLocation(ctx)
           },
           init: undefined,
           TYPE: <string>ctx._type.text
@@ -501,7 +502,8 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
           type: 'VariableDeclarator',
           id: {
             type: 'Identifier',
-            name: <string>ctx._id.text
+            name: <string>ctx._id.text,
+            loc: contextToLocation(ctx)
           },
           init: ctx._value.accept(generator),
           TYPE: 'UNKNOWN'
@@ -521,7 +523,8 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
         operator: '=',
         left: {
           type: 'Identifier',
-          name: <string>ctx._id.text
+          name: <string>ctx._id.text,
+          loc: contextToLocation(ctx)
         },
         right: ctx._value.accept(generator),
         loc: contextToLocation(ctx)
@@ -536,15 +539,21 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       type: 'FunctionDeclaration',
       id: {
         type: 'Identifier',
-        name: <string>ctx._id.text
+        name: <string>ctx._id.text,
+        loc: contextToLocation(ctx)
       },
       params: [],
       body: ctx._body.accept(blk_generator),
+      TYPE: null,
       loc: contextToLocation(ctx)
     }
 
     //Debug
-    console.log("BODY DONE")
+    // console.log('BODY DONE')
+
+    if (ctx._type) {
+      ESTreeFunctionDeclaration.TYPE = ctx._type.text
+    }
 
     const arg_generator = new IdentifierGenerator()
     for (let i = 0; i < ctx.arg_type().length; i++) {
@@ -593,7 +602,7 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
 
   visitIfStatement(ctx: IfStatementContext): es.Statement {
     const generator = new ExpressionGenerator()
-    let alternative;
+    let alternative
     if (ctx._alternate == undefined) {
       alternative = null
     } else {
@@ -604,7 +613,7 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       consequent: this.visit(ctx._consequent),
       loc: contextToLocation(ctx),
       test: ctx._test.accept(generator),
-      type: "IfStatement"
+      type: 'IfStatement'
     }
   }
 
@@ -612,7 +621,7 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     return {
       body: [this.visit(ctx._body)],
       loc: contextToLocation(ctx),
-      type: "BlockStatement"
+      type: 'BlockStatement'
     }
   }
 }

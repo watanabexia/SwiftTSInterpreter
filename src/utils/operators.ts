@@ -1,4 +1,4 @@
-import {BinaryOperator, LogicalOperator, UnaryOperator} from 'estree'
+import { BinaryOperator, LogicalOperator, UnaryOperator } from 'estree'
 import {
   CallingNonFunctionValue,
   ExceptionError,
@@ -189,7 +189,7 @@ export function evaluateLogicalExpression(operator: LogicalOperator, left: any, 
 }
 
 export function evaluateIfStatement(test: any, consequent: any, alternate: any) {
-  if(test == true) {
+  if (test == true) {
     return consequent
   } else if (alternate != null) {
     return alternate

@@ -5,10 +5,10 @@ import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
 import {
-    evaluateBinaryExpression,
-    evaluateIfStatement,
-    evaluateLogicalExpression,
-    evaluateUnaryExpression
+  evaluateBinaryExpression,
+  evaluateIfStatement,
+  evaluateLogicalExpression,
+  evaluateUnaryExpression
 } from '../utils/operators'
 // import { primitive } from '../utils/astCreator'
 import * as rttc from '../utils/rttc'
@@ -66,7 +66,7 @@ const createEnvironment = (
   }
   if (callExpression) {
     environment.callExpression = {
-      ...callExpression,
+      ...callExpression
       // arguments: args.map(primitive)
     }
   }
@@ -93,9 +93,9 @@ const createFunctionEnvironment = (
   // console.log("CREATE FUNC ENV")
   // console.log(arg_ids)
   // console.log(args)
-  
+
   for (let i = 0; i < arg_ids.length; i++) {
-    environment.head[arg_ids[i].name] = args[i].VALUE
+    environment.head[arg_ids[i].name] = args[i]
   }
   return environment
 }
@@ -212,7 +212,12 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 }
 
 function evaluateIdentifier(context: Context, name: string, node: es.Node) {
-  const environment = currentEnvironment(context)
+  let environment = currentEnvironment(context)
+  while (environment.tail !== null 
+    && (!environment.head.hasOwnProperty(name))) {
+      environment = environment.tail
+    }
+  
   if (environment.head.hasOwnProperty(name)) {
     //Debug
     // console.log(environment.head[name])
@@ -300,9 +305,8 @@ function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
     //Debug
     // console.log(result)
 
-    if (result instanceof ReturnValue) {
-      return result.value
-    } else if (
+    if (
+      result instanceof ReturnValue ||
       result instanceof TailCallReturnValue ||
       result instanceof BreakValue ||
       result instanceof ContinueValue
@@ -378,14 +382,33 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         //Debug
         // console.log(callee)
 
-        let env = createFunctionEnvironment(callee_name, callee.params, args, context)
+        let arg_variables = []
+        for (let i = 0; i < args.length; i++) {
+          const arg_value = yield* evaluate(args[i].VALUE!, context)
+          const real_value = {
+            "type": "Literal",
+            "mutable": true,
+            "TYPE": get_type(arg_value),
+            "value": arg_value
+          }
+          arg_variables.push(real_value)
+        }
+
+        const env = createFunctionEnvironment(callee_name, callee.params, arg_variables, context)
         pushEnvironment(context, env)
 
         //Debug
+        // console.log("CallExpression")
         // console.log(currentEnvironment(context))
 
-        const result = yield* evaluate(callee.value, context)
+        let result = yield* evaluate(callee.value, context)
         popEnvironment(context)
+
+        if (result instanceof ReturnValue) {
+          result = result.value
+        } else {
+          result = null
+        }
 
         return result
         // throw new Error("Call expressions not supported in x-slang");
@@ -522,7 +545,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     FunctionDeclaration: function*(node: es.FunctionDeclaration, context: Context) {
         //Debug
-        console.log("FUNC DECLARE")
+        // console.log("FUNC DECLARE")
         
         const name = (<es.Identifier>node.id).name
         const real_value = {
@@ -557,7 +580,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     ReturnStatement: function*(node: es.ReturnStatement, context: Context) {
 
-        let result = yield* evaluate(<es.Expression>node.argument, context)
+        const result = yield* evaluate(<es.Expression>node.argument, context)
         return new ReturnValue(result)
         // throw new Error("Return statements not supported in x-slang");
     },
@@ -606,9 +629,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
 export function* evaluate(node: es.Node, context: Context) {
   //Debug
-  console.log("Evaluating...")
-  console.log(node)
-  console.log(">>>>>>>>>>")
+  // console.log('Evaluating...')
+  // console.log(node)
+  // console.log('>>>>>>>>>>')
 
   yield* visit(context, node)
   const result = yield* evaluators[node.type](node, context)

@@ -274,12 +274,14 @@ export const functionDeclaration = (
   id: es.Identifier | null,
   params: es.Pattern[],
   body: es.BlockStatement,
+  TYPE: string | null,
   loc?: es.SourceLocation | null
 ): es.FunctionDeclaration => ({
   type: 'FunctionDeclaration',
   id,
   params,
   body,
+  TYPE,
   loc
 })
 
