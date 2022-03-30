@@ -180,7 +180,12 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
 }
 
 function assignVariables(context: Context, name: string, value: any, node: es.Node) {
-  const environment = currentEnvironment(context)
+  let environment = currentEnvironment(context)
+  while (environment.tail !== null 
+    && (!environment.head.hasOwnProperty(name))) {
+      environment = environment.tail
+    }
+
   if (environment.head.hasOwnProperty(name)) {
     if (typeof environment.head[name] !== 'symbol') {
       const v_type = get_type(value)

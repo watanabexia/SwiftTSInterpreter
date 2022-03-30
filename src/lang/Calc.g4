@@ -39,6 +39,9 @@ RTN: 'return';
 
 IF: 'if';
 ELSE: 'else';
+
+PRINT: 'print';
+
 ID: [a-zA-Z_] [a-zA-Z0-9_]*;
 STR: '"' ~[\r\n]* '"';
 
@@ -63,6 +66,10 @@ types: INT
 declare_types: LET
              | VAR
              ;
+
+built_in: PRINT
+        | INT
+        ;
 
 arg_type: id=ID ':' type=types ','?
    ;
@@ -93,9 +100,16 @@ expr
    | TRUE                                               # True
    | FALSE                                              # False
    | STR                                                # String
-   | int=expr '.' frac=expr                             # Decimal
+   | int=NUMBER '.' frac=NUMBER                         # Decimal
    | '(' inner=expr ')'                                 # Parentheses
+   | id=built_in '(' argument=expr ')'                  # BIFuncCall
    | id=ID '(' argument=arg_value* ')'                  # FuncCall
+   | left=expr operator=MOD right=expr                  # Modulo
+   | left=expr operator=MUL right=expr                  # Multiplication
+   | left=expr operator=DIV right=expr                  # Division
+   | left=expr operator=ADD right=expr                  # Addition
+   | left=expr operator=SUB right=expr                  # Subtraction
+   | left=expr operator=POW right=expr                  # Power
    | left=expr operator=EQUAL right=expr                # Equal
    | left=expr operator=NOTEQUAL right=expr             # NotEqual
    | left=expr operator=GREATERTHANOREQUAL right=expr   # GreaterThanOrEqual
@@ -105,10 +119,5 @@ expr
    | left=expr operator=LOGICALAND right=expr           # LogicalAnd
    | left=expr operator=LOGICALOR right=expr            # LogicalOr
    | operator=LOGICALNOT argument=expr                  # LogicalNot
-   | left=expr operator=POW right=expr                  # Power
-   | left=expr operator=MUL right=expr                  # Multiplication
-   | left=expr operator=DIV right=expr                  # Division
-   | left=expr operator=ADD right=expr                  # Addition
-   | left=expr operator=SUB right=expr                  # Subtraction
-   | left=expr operator=MOD right=expr                  # Modulo
+   | operator=SUB argument=expr                         # Negate
    ;

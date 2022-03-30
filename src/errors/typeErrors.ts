@@ -235,7 +235,11 @@ export class AssignmentTypeError implements SourceError {
   public type = ErrorType.TYPE
   public severity = ErrorSeverity.WARNING
 
-  constructor(public node: TypeAnnotatedNode<es.Node>, public left_TYPE: Type, public right_TYPE: Type) {}
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public left_TYPE: Type,
+    public right_TYPE: Type
+  ) {}
 
   get location() {
     return this.node.loc!
@@ -243,7 +247,36 @@ export class AssignmentTypeError implements SourceError {
 
   public explain() {
     return stripIndent`
-    Cannot assign value of type '${typeToString(this.right_TYPE)}' to type '${typeToString(this.left_TYPE)}'
+    Cannot assign value of type '${typeToString(this.right_TYPE)}' to type '${typeToString(
+      this.left_TYPE
+    )}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class ReturnTypeError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public expectedType: Type,
+    public receivedType: Type
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Cannot convert return expression of type value of type '${typeToString(this.receivedType)}' to type '${typeToString(
+      this.expectedType
+    )}'
     `
   }
 
