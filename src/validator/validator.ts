@@ -2,7 +2,11 @@ import { ancestor, base, FullWalkerCallback } from '../utils/walkers'
 import * as es from 'estree'
 import { Context, TypeAnnotatedNode } from '../types'
 import { getVariableDecarationName } from '../utils/astCreator'
-import { ParseMissingReturnError, ParseUnexpectedReturnError, ParseUnfoundError } from '../errors/typeErrors'
+import {
+  ParseMissingReturnError,
+  ParseUnexpectedReturnError,
+  ParseUnfoundError
+} from '../errors/typeErrors'
 
 class Declaration {
   public accessedBeforeDeclaration: boolean = false
@@ -160,7 +164,7 @@ export function validateAndAnnotate(
       Identifier: validateIdentifier,
       FunctionDeclaration(node: TypeAnnotatedNode<es.FunctionDeclaration>, ancestors: es.Node[]) {
         // a function declaration can be typed if there are no function calls in the same scope before it
-  
+
         // Update available token
         const lastAncestor = ancestors[ancestors.length - 2]
         const name = node.id!.name
@@ -194,7 +198,7 @@ export function validateAndAnnotate(
         }
 
         // call.typability = 'NotYetTyped'
-      },
+      }
       // Literal(node: TypeAnnotatedNode<es.Literal>, ancestors: es.Node[]) {
       //   node.typability = 'NotYetTyped'
       // },

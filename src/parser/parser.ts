@@ -47,7 +47,8 @@ import {
   Arg_typeContext,
   ReturnStatContext,
   FuncCallContext,
-  Arg_valueContext
+  Arg_valueContext,
+  NegateContext,
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -354,6 +355,16 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
+  visitNegate(ctx: NegateContext): es.Expression {
+    return {
+      type: 'UnaryExpression',
+      operator: '-',
+      prefix: true,
+      argument: this.visit(ctx._argument),
+      loc: contextToLocation(ctx)
+    }
+  }
+
 visitClassCall(ctx: ClassCallContext): es.CallExpression {
     const ESTreeCallExpression: es.CallExpression = {
       type: 'CallExpression',
@@ -406,6 +417,10 @@ visitClassCall(ctx: ClassCallContext): es.CallExpression {
 
     return ESTreeCallExpression
   }
+
+  // visitBIFuncCall(ctx: BIFuncCallContext): es.CallExpression {
+
+  // }
 
   visitExpression?: ((ctx: ExprContext) => es.Expression) | undefined
   visitStart?: ((ctx: StatContext) => es.Expression) | undefined
@@ -601,7 +616,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       TYPE: null,
       loc: contextToLocation(ctx)
     }
-
     if (ctx._type) {
       ESTreeFunctionDeclaration.TYPE = ctx._type.text
     }
@@ -899,8 +913,9 @@ export function parse(source: string, context: Context) {
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
 
       //Debug
-      console.log('ESTree AST:')
-      console.log(program)
+      // console.log('ESTree AST:')
+      // console.log(program)
+
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
         //Debug

@@ -19,7 +19,15 @@ import {
   InternalDifferentNumberArgumentsError,
   InternalCyclicReferenceError
 } from './internalTypeErrors'
-import { InvalidArgumentTypesError, CyclicReferenceError, UnknownTypeError, AssignmentTypeError, DifferentNumberArgumentsError, IncorrectArgumentsLabelError } from '../errors/typeErrors'
+import {
+  InvalidArgumentTypesError,
+  CyclicReferenceError,
+  UnknownTypeError,
+  AssignmentTypeError,
+  DifferentNumberArgumentsError,
+  IncorrectArgumentsLabelError,
+  ReturnTypeError
+} from '../errors/typeErrors'
 
 /** Name of Unary negative builtin operator */
 const NEGATIVE_OP = '-_1'
@@ -40,7 +48,6 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
   }
   if (constraints && node.typability !== 'Untypable') {
     try {
-
       //Debug
       // console.log("APPLY CONSTRAINTS TYPE >>>>")
       // console.log(node)
@@ -89,6 +96,11 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
       throw Error('For statements not supported for x-slang')
     case 'ConditionalExpression': // both cases are the same
     case 'IfStatement': {
+      traverse(node.test, constraints)
+      traverse(node.consequent, constraints)
+      if (node.alternate) {
+        traverse(node.alternate)
+      }
       break
     }
     case 'CallExpression': {
@@ -98,6 +110,7 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
       break
     }
     case 'ReturnStatement': {
+      traverse(node.argument!)
       break
     }
     case 'VariableDeclaration': {
@@ -110,6 +123,7 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
     case 'ArrowFunctionExpression':
       throw Error('Arrow functions not supported for x-slang')
     case 'FunctionDeclaration': {
+      traverse(node.body)
       break
     }
     case 'AssignmentExpression': {
@@ -393,7 +407,10 @@ function cannotBeResolvedIfAddable(LHS: Variable, RHS: Type): boolean {
   return (
     LHS.constraint === 'addable' &&
     RHS.kind !== 'variable' &&
-    !(RHS.kind === 'primitive' && (RHS.name === 'String' || RHS.name === 'Int' || RHS.name === 'Double'))
+    !(
+      RHS.kind === 'primitive' &&
+      (RHS.name === 'Int' || RHS.name === 'Double')
+    )
   )
 }
 
@@ -591,14 +608,13 @@ function infer(
   isTopLevelAndLastValStmt: boolean = false
 ): Constraint[] {
   try {
-
     //Debug
     // console.log("Type ENV >>>")
     // console.log(env)
     // console.log("Constraint List >>>")
     // console.log(constraints)
-    // console.log("Infer Type >>>")
-    // console.log(node)
+    console.log("Infer Type >>>")
+    console.log(node)
 
     return _infer(node, env, constraints, isTopLevelAndLastValStmt)
   } catch (e) {
@@ -621,7 +637,8 @@ function _infer(
   switch (node.type) {
     case 'UnaryExpression': {
       const op = node.operator === '-' ? NEGATIVE_OP : node.operator
-      const funcType = lookupType(op, env) as FunctionType // in either case its a monomorphic type
+      const envType = lookupType(op, env)!
+      const funcType = envType.kind === 'forall' ? extractFreeVariablesAndGenFresh(envType) as FunctionType : envType as FunctionType // in either case its a monomorphic type
       const argNode = node.argument as TypeAnnotatedNode<es.Node>
       const argType = argNode.inferredType as Variable
       const receivedTypes: Type[] = []
@@ -674,14 +691,29 @@ function _infer(
     case 'ExpressionStatement': {
       return infer(node.expression, env, addToConstraintList(constraints, [storedType, tUndef]))
     }
-    case 'ReturnStatement':
-      throw Error('Return statements not supported for x-slang')
+    case 'ReturnStatement': {
+      const argNode = node.argument as TypeAnnotatedNode<es.Expression>
+      infer(node.argument!, env, constraints)
+
+      //Debug
+      console.log("INFER RTN Stmt")
+      console.log(argNode)
+      console.log(storedType)
+      console.log(argNode.inferredType)
+
+      return addToConstraintList(constraints, [storedType, argNode.inferredType!])
+    }
     case 'WhileStatement':
       throw Error('Return statements not supported for x-slang')
     case 'ForStatement':
       throw Error('Return statements not supported for x-slang')
-    case 'BlockStatement':
-      throw Error('Block statements not supported for x-slang')
+    case 'BlockStatement': {
+      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
+      for (let i = 0; i < node.body.length; i++) {
+        newConstraints = infer(node.body[i], env, newConstraints)
+      }
+      return newConstraints
+    }
     case 'Program': {
       pushEnv(env)
       const lastStatementIndex = node.body.length - 1
@@ -719,8 +751,7 @@ function _infer(
       if (literalVal === null) {
         return addToConstraintList(constraints, [storedType, tList(tVar(typeIdCounter++))])
       } else if (typeOfLiteral === 'number') {
-        if (<number>node.value % 1 === 0) {
-
+        if (node.raw?.includes('.') === false) {
           //Debug
           // console.log("HERE 0329")
 
@@ -745,11 +776,18 @@ function _infer(
       return addToConstraintList(constraints, [storedType, idType])
 
       // throw Error('Identifiers not supported for x-slang')
-    }  
+    }
     case 'ConditionalExpression': // both cases are the same
       throw Error('Conditional expressions not supported for x-slang')
-    case 'IfStatement':
-      throw Error('If statements not supported for x-slang')
+    case 'IfStatement': {
+      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
+      newConstraints = infer(node.test, env, newConstraints)
+      newConstraints = infer(node.consequent, env, newConstraints)
+      if (node.alternate) {
+        newConstraints = infer(node.alternate, env, newConstraints)
+      }
+      return newConstraints
+    }
     case 'ArrowFunctionExpression':
       throw Error('Arrow functions not supported for x-slang')
     case 'VariableDeclaration': {
@@ -759,9 +797,8 @@ function _infer(
 
       const lastEnvID = env.length - 1
 
-      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
+      const newConstraints = addToConstraintList(constraints, [storedType, tUndef])
       if (node.declarations[0].init === undefined) {
-
         const v_type = node.declarations[0].TYPE
         const vType = getType(node, v_type)
 
@@ -771,7 +808,7 @@ function _infer(
         return newConstraints
       } else {
         infer(node.declarations[0].init!, env, newConstraints)
-        
+
         const initNode = node.declarations[0].init as TypeAnnotatedNode<es.Expression>
         const vType = initNode.inferredType
         env[lastEnvID].typeMap.set(v_name, vType!)
@@ -786,8 +823,8 @@ function _infer(
       const f_name = f_nameNode.name
       const RTN_Type = node.TYPE
       const RTNType = getType(node, RTN_Type)
-      let param_names = []
-      let Types = []
+      const param_names = []
+      const Types = []
 
       for (let i = 0; i < node.params.length; i++) {
         const param = node.params[i] as es.Identifier
@@ -802,16 +839,33 @@ function _infer(
 
       const lastEnvID = env.length - 1
 
-      let fType = tFunc(...Types)
+      const fType = tFunc(...Types)
       fType.parameterNames = param_names
 
-      //Debug
-      // console.log("F DECLARE TYPECHECK")
-      // console.log(f_name)
-      // console.log(RTNType)
-      // console.log(fType)
-
       env[lastEnvID].typeMap.set(f_name, fType)
+
+      pushEnv(env)
+      for (let i = 0; i < Types.length; i++) {
+        env[env.length - 1].typeMap.set(param_names[i], Types[i])
+        env[env.length - 1].declKindMap.set(param_names[i], 'var')
+      }
+      newConstraints = infer(node.body, env, constraints)
+      env.pop()
+
+      if (RTNType.name !== 'Undefined' && statementHasReturn(node.body)) {
+        const RTNIndex = returnBlockValueNodeIndexFor(node.body, false)
+        const RTNStmt = node.body.body[RTNIndex] as TypeAnnotatedNode<es.ReturnStatement>
+        const RTNStmtType = RTNStmt.inferredType!
+
+        try {
+          newConstraints = addToConstraintList(constraints, [RTNType, RTNStmtType])
+        } catch (e) {
+          const received_Type = applyConstraints(RTNStmtType, constraints)
+          if (e instanceof UnifyError) {
+            typeErrors.push(new ReturnTypeError(node, RTNType, received_Type))
+          }
+        }
+      }
 
       return newConstraints
     }
@@ -824,10 +878,9 @@ function _infer(
       const paramTypes = fType.parameterTypes
       const fRTNType = fType.returnType
 
-
       // let argValues = []
-      let arg_types:Type[] = []
-      let argNames = []
+      const arg_types: Type[] = []
+      const argNames = []
 
       for (let i = 0; i < node.arguments.length; i++) {
         const arg = node.arguments[i] as es.Identifier
@@ -857,9 +910,13 @@ function _infer(
           newConstraints = addToConstraintList(constraints, [argTypes, fType])
         } catch (e) {
           if (e instanceof UnifyError) {
-
             typeErrors.push(
-              new InvalidArgumentTypesError(node, node.arguments, paramTypes, argTypes.parameterTypes.map(pType => applyConstraints(pType, constraints)))
+              new InvalidArgumentTypesError(
+                node,
+                node.arguments,
+                paramTypes,
+                argTypes.parameterTypes.map(pType => applyConstraints(pType, constraints))
+              )
             )
           }
         }
@@ -877,7 +934,7 @@ function _infer(
       let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
       newConstraints = infer(node.left, env, newConstraints)
       newConstraints = infer(node.right, env, newConstraints)
-      
+
       const leftNode = node.left as TypeAnnotatedNode<es.Node>
       const leftType = leftNode.inferredType!
       const rightNode = node.right as TypeAnnotatedNode<es.Node>
@@ -887,13 +944,10 @@ function _infer(
         newConstraints = addToConstraintList(constraints, [leftType, rightType])
       } catch (e) {
         if (e instanceof UnifyError) {
-
           const leftType_received = applyConstraints(leftType, newConstraints)!
           const rightType_received = applyConstraints(rightType, newConstraints)!
 
-          typeErrors.push(
-            new AssignmentTypeError(node, leftType_received, rightType_received)
-          )
+          typeErrors.push(new AssignmentTypeError(node, leftType_received, rightType_received))
         }
       }
 
@@ -981,15 +1035,18 @@ const primitiveFuncs: [string, Type | ForAll][] = [
   ['!', tFunc(tBool, tBool)],
   ['&&', tForAll(tFunc(tBool, tVar('T'), tVar('T')))],
   ['||', tForAll(tFunc(tBool, tVar('T'), tVar('T')))],
-  ['<', tForAll(tFunc(tAddable('A'), tAddable('A'), tBool))],
-  ['<=', tForAll(tFunc(tAddable('A'), tAddable('A'), tBool))],
-  ['>', tForAll(tFunc(tAddable('A'), tAddable('A'), tBool))],
-  ['>=', tForAll(tFunc(tAddable('A'), tAddable('A'), tBool))],
-  ['+', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
-  ['%', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
-  ['-', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
-  ['*', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
-  ['/', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))]
+  ['<', tForAll(tFunc(tAddable('A'), tAddable('B'), tBool))],
+  ['<=', tForAll(tFunc(tAddable('A'), tAddable('B'), tBool))],
+  ['>', tForAll(tFunc(tAddable('A'), tAddable('B'), tBool))],
+  ['>=', tForAll(tFunc(tAddable('A'), tAddable('B'), tBool))],
+  ['!=', tForAll(tFunc(tAddable('A'), tAddable('B'), tBool))],
+  ['==', tForAll(tFunc(tAddable('A'), tAddable('B'), tBool))],
+  ['+', tForAll(tFunc(tAddable('A'), tAddable('B'), tAddable('C')))],
+  ['%', tForAll(tFunc(tAddable('A'), tAddable('B'), tAddable('C')))],
+  ['-', tForAll(tFunc(tAddable('A'), tAddable('B'), tAddable('C')))],
+  ['*', tForAll(tFunc(tAddable('A'), tAddable('B'), tAddable('C')))],
+  ['/', tForAll(tFunc(tAddable('A'), tAddable('B'), tAddable('C')))],
+  ['^', tForAll(tFunc(tAddable('A'), tAddable('B'), tAddable('C')))]
 ]
 
 export function createTypeEnvironment(): Env {
