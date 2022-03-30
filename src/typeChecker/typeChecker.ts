@@ -19,7 +19,7 @@ import {
   InternalDifferentNumberArgumentsError,
   InternalCyclicReferenceError
 } from './internalTypeErrors'
-import { InvalidArgumentTypesError, CyclicReferenceError } from '../errors/typeErrors'
+import { InvalidArgumentTypesError, CyclicReferenceError, UnknownTypeError, AssignmentTypeError, DifferentNumberArgumentsError, IncorrectArgumentsLabelError } from '../errors/typeErrors'
 
 /** Name of Unary negative builtin operator */
 const NEGATIVE_OP = '-_1'
@@ -40,6 +40,11 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
   }
   if (constraints && node.typability !== 'Untypable') {
     try {
+
+      //Debug
+      // console.log("APPLY CONSTRAINTS TYPE >>>>")
+      // console.log(node)
+
       node.inferredType = applyConstraints(node.inferredType as Type, constraints)
       node.typability = 'Typed'
     } catch (e) {
@@ -72,27 +77,46 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
       traverse(node.expression, constraints)
       break
     }
-    case 'BlockStatement':
-      throw Error('Block statements not supported for x-slang')
+    case 'BlockStatement': {
+      node.body.forEach(nodeBody => {
+        traverse(nodeBody, constraints)
+      })
+      break
+    }
     case 'WhileStatement':
       throw Error('While statements not supported for x-slang')
     case 'ForStatement':
       throw Error('For statements not supported for x-slang')
     case 'ConditionalExpression': // both cases are the same
-    case 'IfStatement':
-      throw Error('If statements not supported for x-slang')
-    case 'CallExpression':
-      throw Error('Call statements not supported for x-slang')
-    case 'ReturnStatement':
-      throw Error('Return statements not supported for x-slang')
-    case 'VariableDeclaration':
-      throw Error('Variable statements not supported for x-slang')
+    case 'IfStatement': {
+      break
+    }
+    case 'CallExpression': {
+      node.arguments.forEach(arg => {
+        traverse(arg.VALUE!, constraints)
+      })
+      break
+    }
+    case 'ReturnStatement': {
+      break
+    }
+    case 'VariableDeclaration': {
+      traverse(node.declarations[0].id, constraints)
+      if (node.declarations[0].init !== undefined) {
+        traverse(node.declarations[0].init!, constraints)
+      }
+      break
+    }
     case 'ArrowFunctionExpression':
       throw Error('Arrow functions not supported for x-slang')
-    case 'FunctionDeclaration':
-      throw Error('Function declarations  not supported for x-slang')
-    case 'AssignmentExpression':
-      throw Error('Assignments expressions not supported for x-slang')
+    case 'FunctionDeclaration': {
+      break
+    }
+    case 'AssignmentExpression': {
+      traverse(node.left, constraints)
+      traverse(node.right, constraints)
+      break
+    }
     case 'ArrayExpression':
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression':
@@ -147,7 +171,16 @@ export function typeCheck(
     // we ignore the errors here since
     // they would have already been processed
   }
+
+  //Debug
+  // console.log("FINAL Constraints >>>>>>>>>>>>>>>>>>")
+  // console.log(constraints)
+  // console.log(program)
+
   traverse(program, constraints)
+
+  context.errors = context.errors.concat(typeErrors)
+
   return [program, typeErrors]
 }
 
@@ -360,7 +393,7 @@ function cannotBeResolvedIfAddable(LHS: Variable, RHS: Type): boolean {
   return (
     LHS.constraint === 'addable' &&
     RHS.kind !== 'variable' &&
-    !(RHS.kind === 'primitive' && (RHS.name === 'string' || RHS.name === 'number'))
+    !(RHS.kind === 'primitive' && (RHS.name === 'String' || RHS.name === 'Int' || RHS.name === 'Double'))
   )
 }
 
@@ -516,6 +549,40 @@ function pushEnv(env: Env) {
   env.push({ typeMap: new Map(), declKindMap: new Map() })
 }
 
+function getType(node: es.Node, TYPE: string | undefined | null) {
+  let type = tUndef
+  switch (TYPE) {
+    case 'Int':
+      type = tInt
+      break
+    case 'Double':
+      type = tDouble
+      break
+    case 'String':
+      type = tString
+      break
+    case 'Bool':
+      type = tBool
+      break
+    case undefined:
+    case null:
+      type = tUndef
+      break
+    default:
+      typeErrors.push(new UnknownTypeError(node, TYPE))
+  }
+  return type
+}
+
+function isEqual(array1: any[], array2: any[]) {
+  for (let i = 0; i < array1.length; i++) {
+    if (array1[i] !== array2[i]) {
+      return false
+    }
+  }
+  return true
+}
+
 /* tslint:disable cyclomatic-complexity */
 function infer(
   node: TypeAnnotatedNode<es.Node>,
@@ -524,6 +591,15 @@ function infer(
   isTopLevelAndLastValStmt: boolean = false
 ): Constraint[] {
   try {
+
+    //Debug
+    // console.log("Type ENV >>>")
+    // console.log(env)
+    // console.log("Constraint List >>>")
+    // console.log(constraints)
+    // console.log("Infer Type >>>")
+    // console.log(node)
+
     return _infer(node, env, constraints, isTopLevelAndLastValStmt)
   } catch (e) {
     if (e instanceof InternalCyclicReferenceError) {
@@ -615,7 +691,10 @@ function _infer(
       const lastNodeType = (isTopLevelAndLastValStmt && lastNode.type === 'ExpressionStatement'
         ? (lastNode.expression as TypeAnnotatedNode<es.Node>).inferredType
         : lastNode.inferredType) as Variable
+
+      //Type of a program is the type of its last node
       let newConstraints = addToConstraintList(constraints, [storedType, lastNodeType])
+
       for (let i = 0; i <= lastDeclNodeIndex; i++) {
         if (i === returnValNodeIndex) {
           newConstraints = infer(node.body[i], env, newConstraints, isTopLevelAndLastValStmt)
@@ -640,7 +719,15 @@ function _infer(
       if (literalVal === null) {
         return addToConstraintList(constraints, [storedType, tList(tVar(typeIdCounter++))])
       } else if (typeOfLiteral === 'number') {
-        return addToConstraintList(constraints, [storedType, tNumber])
+        if (<number>node.value % 1 === 0) {
+
+          //Debug
+          // console.log("HERE 0329")
+
+          return addToConstraintList(constraints, [storedType, tInt])
+        } else {
+          return addToConstraintList(constraints, [storedType, tDouble])
+        }
       } else if (typeOfLiteral === 'boolean') {
         return addToConstraintList(constraints, [storedType, tBool])
       } else if (typeOfLiteral === 'string') {
@@ -648,22 +735,171 @@ function _infer(
       }
       throw Error('Unexpected literal type')
     }
-    case 'Identifier':
-      throw Error('Identifiers not supported for x-slang')
+    case 'Identifier': {
+      const idType = lookupType(node.name, env) as Type
+
+      //Debug
+      // console.log("IDentifIER!!!!!!")
+      // console.log(idType)
+
+      return addToConstraintList(constraints, [storedType, idType])
+
+      // throw Error('Identifiers not supported for x-slang')
+    }  
     case 'ConditionalExpression': // both cases are the same
       throw Error('Conditional expressions not supported for x-slang')
     case 'IfStatement':
       throw Error('If statements not supported for x-slang')
     case 'ArrowFunctionExpression':
       throw Error('Arrow functions not supported for x-slang')
-    case 'VariableDeclaration':
-      throw Error('Variable declarations not supported for x-slang')
-    case 'FunctionDeclaration':
-      throw Error('Function declarations not supported for x-slang')
-    case 'CallExpression':
-      throw Error('Call expressions not supported for x-slang')
-    case 'AssignmentExpression':
-      throw Error('Assignment expressions not supported for x-slang')
+    case 'VariableDeclaration': {
+      const v_nameNode = node.declarations[0].id as es.Identifier
+      const v_name = v_nameNode.name
+      const vDType = node.kind
+
+      const lastEnvID = env.length - 1
+
+      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
+      if (node.declarations[0].init === undefined) {
+
+        const v_type = node.declarations[0].TYPE
+        const vType = getType(node, v_type)
+
+        env[lastEnvID].typeMap.set(v_name, vType)
+        env[lastEnvID].declKindMap.set(v_name, vDType)
+
+        return newConstraints
+      } else {
+        infer(node.declarations[0].init!, env, newConstraints)
+        
+        const initNode = node.declarations[0].init as TypeAnnotatedNode<es.Expression>
+        const vType = initNode.inferredType
+        env[lastEnvID].typeMap.set(v_name, vType!)
+        env[lastEnvID].declKindMap.set(v_name, vDType)
+
+        return newConstraints
+        // return infer(node.declarations[0].init!, env, ))
+      }
+    }
+    case 'FunctionDeclaration': {
+      const f_nameNode = node.id as es.Identifier
+      const f_name = f_nameNode.name
+      const RTN_Type = node.TYPE
+      const RTNType = getType(node, RTN_Type)
+      let param_names = []
+      let Types = []
+
+      for (let i = 0; i < node.params.length; i++) {
+        const param = node.params[i] as es.Identifier
+        param_names.push(param.name)
+        const p_type = param.TYPE
+        const pType = getType(node, p_type)
+        Types.push(pType)
+      }
+      Types.push(RTNType)
+
+      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
+
+      const lastEnvID = env.length - 1
+
+      let fType = tFunc(...Types)
+      fType.parameterNames = param_names
+
+      //Debug
+      // console.log("F DECLARE TYPECHECK")
+      // console.log(f_name)
+      // console.log(RTNType)
+      // console.log(fType)
+
+      env[lastEnvID].typeMap.set(f_name, fType)
+
+      return newConstraints
+    }
+    case 'CallExpression': {
+      const f_calleeNode = node.callee as es.Identifier
+      const f_name = f_calleeNode.name
+      const fType = lookupType(f_name, env)! as FunctionType
+
+      const paramNames = fType.parameterNames!
+      const paramTypes = fType.parameterTypes
+      const fRTNType = fType.returnType
+
+
+      // let argValues = []
+      let arg_types:Type[] = []
+      let argNames = []
+
+      for (let i = 0; i < node.arguments.length; i++) {
+        const arg = node.arguments[i] as es.Identifier
+        argNames.push(arg.name)
+
+        const arg_value = arg.VALUE as TypeAnnotatedNode<es.Expression>
+        infer(arg_value, env, constraints)
+        // argValues.push(arg_value)
+        arg_types.push(arg_value.inferredType!)
+      }
+
+      arg_types.push(fRTNType)
+      const argTypes = tFunc(...arg_types)
+
+      //Debug
+      // console.log("F TYPE CHECK")
+      // console.log(f_name)
+      // console.log(fType)
+      // console.log(argTypes)
+
+      let newConstraints = constraints
+
+      if (argNames.length !== paramNames.length) {
+        typeErrors.push(new DifferentNumberArgumentsError(node, paramNames.length, argNames.length))
+      } else if (isEqual(argNames, paramNames)) {
+        try {
+          newConstraints = addToConstraintList(constraints, [argTypes, fType])
+        } catch (e) {
+          if (e instanceof UnifyError) {
+
+            typeErrors.push(
+              new InvalidArgumentTypesError(node, node.arguments, paramTypes, argTypes.parameterTypes.map(pType => applyConstraints(pType, constraints)))
+            )
+          }
+        }
+      } else {
+        typeErrors.push(new IncorrectArgumentsLabelError(node, argNames, paramNames))
+      }
+
+      newConstraints = addToConstraintList(constraints, [storedType, fRTNType])
+
+      return newConstraints
+
+      // throw Error('Call expressions not supported for x-slang')
+    }
+    case 'AssignmentExpression': {
+      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
+      newConstraints = infer(node.left, env, newConstraints)
+      newConstraints = infer(node.right, env, newConstraints)
+      
+      const leftNode = node.left as TypeAnnotatedNode<es.Node>
+      const leftType = leftNode.inferredType!
+      const rightNode = node.right as TypeAnnotatedNode<es.Node>
+      const rightType = rightNode.inferredType!
+
+      try {
+        newConstraints = addToConstraintList(constraints, [leftType, rightType])
+      } catch (e) {
+        if (e instanceof UnifyError) {
+
+          const leftType_received = applyConstraints(leftType, newConstraints)!
+          const rightType_received = applyConstraints(rightType, newConstraints)!
+
+          typeErrors.push(
+            new AssignmentTypeError(node, leftType_received, rightType_received)
+          )
+        }
+      }
+
+      return newConstraints
+      // throw Error('Assignment expressions not supported for x-slang')
+    }
     case 'ArrayExpression':
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression':
@@ -722,10 +958,11 @@ export function tForAll(type: Type): ForAll {
   }
 }
 
-const tBool = tPrimitive('boolean')
-const tNumber = tPrimitive('number')
-const tString = tPrimitive('string')
-const tUndef = tPrimitive('undefined')
+const tBool = tPrimitive('Bool')
+const tInt = tPrimitive('Int')
+const tDouble = tPrimitive('Double')
+const tString = tPrimitive('String')
+const tUndef = tPrimitive('Undefined')
 
 function tFunc(...types: Type[]): FunctionType {
   const parameterTypes = types.slice(0, -1)
@@ -740,7 +977,7 @@ function tFunc(...types: Type[]): FunctionType {
 const predeclaredNames: [string, Type | ForAll][] = []
 
 const primitiveFuncs: [string, Type | ForAll][] = [
-  [NEGATIVE_OP, tFunc(tNumber, tNumber)],
+  [NEGATIVE_OP, tForAll(tFunc(tAddable('A'), tAddable('A')))],
   ['!', tFunc(tBool, tBool)],
   ['&&', tForAll(tFunc(tBool, tVar('T'), tVar('T')))],
   ['||', tForAll(tFunc(tBool, tVar('T'), tVar('T')))],
@@ -749,10 +986,10 @@ const primitiveFuncs: [string, Type | ForAll][] = [
   ['>', tForAll(tFunc(tAddable('A'), tAddable('A'), tBool))],
   ['>=', tForAll(tFunc(tAddable('A'), tAddable('A'), tBool))],
   ['+', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
-  ['%', tFunc(tNumber, tNumber, tNumber)],
-  ['-', tFunc(tNumber, tNumber, tNumber)],
-  ['*', tFunc(tNumber, tNumber, tNumber)],
-  ['/', tFunc(tNumber, tNumber, tNumber)]
+  ['%', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
+  ['-', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
+  ['*', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))],
+  ['/', tForAll(tFunc(tAddable('A'), tAddable('A'), tAddable('A')))]
 ]
 
 export function createTypeEnvironment(): Env {

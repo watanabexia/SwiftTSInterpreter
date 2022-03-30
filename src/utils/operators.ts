@@ -1,4 +1,4 @@
-import {BinaryOperator, LogicalOperator, UnaryOperator} from 'estree'
+import { BinaryOperator, LogicalOperator, UnaryOperator } from 'estree'
 import {
   CallingNonFunctionValue,
   ExceptionError,

@@ -62,7 +62,7 @@ export const constantDeclaration = (
 
 export const callExpression = (
   callee: es.Expression,
-  args: es.Expression[],
+  args: es.Identifier[],
   loc?: es.SourceLocation | null
 ): es.CallExpression => ({
   type: 'CallExpression',
@@ -142,7 +142,7 @@ export const objectExpression = (properties: es.Property[]): es.ObjectExpression
 export const mutateToCallExpression = (
   node: es.Node,
   callee: es.Expression,
-  args: es.Expression[]
+  args: es.Identifier[]
 ) => {
   node.type = 'CallExpression'
   node = node as es.CallExpression
@@ -274,12 +274,14 @@ export const functionDeclaration = (
   id: es.Identifier | null,
   params: es.Pattern[],
   body: es.BlockStatement,
+  TYPE: string | null,
   loc?: es.SourceLocation | null
 ): es.FunctionDeclaration => ({
   type: 'FunctionDeclaration',
   id,
   params,
   body,
+  TYPE,
   loc
 })
 

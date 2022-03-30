@@ -146,7 +146,7 @@ export interface Frame {
 export type Value = any
 // tslint:enable:no-any
 
-export type AllowedDeclarations = 'const' | 'let'
+export type AllowedDeclarations = 'const' | 'let' | 'var'
 
 export interface Environment {
   name: string
@@ -249,7 +249,7 @@ export type Constraint = 'none' | 'addable'
 
 export interface Primitive {
   kind: 'primitive'
-  name: 'number' | 'boolean' | 'string' | 'undefined'
+  name: 'Int' | 'Double' | 'Bool' | 'String' | 'Undefined'
 }
 
 export interface Variable {
@@ -262,6 +262,7 @@ export interface Variable {
 export interface FunctionType {
   kind: 'function'
   parameterTypes: Type[]
+  parameterNames?: string[]
   returnType: Type
 }
 

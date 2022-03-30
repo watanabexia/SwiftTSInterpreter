@@ -258,7 +258,6 @@ export class TypeAssignmentError extends RuntimeSourceError {
   }
 
   public explain() {
-
     return `Cannot assign value of type '${this.v_type}' to type '${this.i_type}'.`
   }
 
