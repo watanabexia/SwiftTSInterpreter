@@ -175,6 +175,9 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
       case 'FunctionDeclaration':
         declareIdentifier(context, (statement.id as es.Identifier).name, statement)
         break
+      case 'ClassDeclaration':
+        declareIdentifier(context, (statement.id as es.Identifier).name, statement)
+        break
     }
   }
 }
@@ -376,46 +379,47 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     CallExpression: function*(node: es.CallExpression, context: Context) {
-        //Debug
-        // console.log("CALL!!")
-        
+        const environment = currentEnvironment(context)
         const callee_name = (<es.Identifier>node.callee).name
-        const callee = yield* evaluate(node.callee, context)
-        const args = node.arguments
-        
-        //Debug
-        // console.log(callee)
-
-        let arg_variables = []
-        for (let i = 0; i < args.length; i++) {
-          const arg_value = yield* evaluate(args[i].VALUE!, context)
-          const real_value = {
-            "type": "Literal",
-            "mutable": true,
-            "TYPE": get_type(arg_value),
-            "value": arg_value
-          }
-          arg_variables.push(real_value)
-        }
-
-        const env = createFunctionEnvironment(callee_name, callee.params, arg_variables, context)
-        pushEnvironment(context, env)
-
-        //Debug
-        // console.log("CallExpression")
-        // console.log(currentEnvironment(context))
-
-        let result = yield* evaluate(callee.value, context)
-        popEnvironment(context)
-
-        if (result instanceof ReturnValue) {
-          result = result.value
+        if(environment.head[callee_name]['TYPE'] == "Class") {
+            return environment.head[callee_name].value.body
         } else {
-          result = null
-        }
+            const callee = yield* evaluate(node.callee, context)
+            const args = node.arguments
 
-        return result
-        // throw new Error("Call expressions not supported in x-slang");
+            //Debug
+            // console.log(callee)
+
+            let arg_variables = []
+            for (let i = 0; i < args.length; i++) {
+              const arg_value = yield* evaluate(args[i].VALUE!, context)
+              const real_value = {
+                "type": "Literal",
+                "mutable": true,
+                "TYPE": get_type(arg_value),
+                "value": arg_value
+              }
+              arg_variables.push(real_value)
+            }
+
+            const env = createFunctionEnvironment(callee_name, callee.params, arg_variables, context)
+            pushEnvironment(context, env)
+
+            //Debug
+            // console.log("CallExpression")
+            // console.log(currentEnvironment(context))
+
+            let result = yield* evaluate(callee.value, context)
+            popEnvironment(context)
+
+            if (result instanceof ReturnValue) {
+              result = result.value
+            } else {
+              result = null
+            }
+
+            return result
+        }
     },
 
     NewExpression: function*(node: es.NewExpression, context: Context) {
@@ -529,7 +533,17 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     MemberExpression: function*(node: es.MemberExpression, context: Context) {
-        throw new Error("Member statements not supported in x-slang");
+        const environment = currentEnvironment(context)
+        const object_name = (<es.Identifier>node.object).name
+        const property_name = (<es.Identifier>node.property).name
+        const properties = environment.head[object_name].value
+
+        for (let i = 0; i < properties.length; i++) {
+            if (properties[i].key.name == property_name) {
+                return properties[i].value.value
+            }
+        }
+        return null
     },
 
     AssignmentExpression: function*(node: es.AssignmentExpression, context: Context) {
@@ -564,6 +578,20 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
         return null;
         // throw new Error("Function declarations not supported in x-slang");
+    },
+
+    ClassDeclaration: function*(node: es.ClassDeclaration, context: Context) {
+        const name = (<es.Identifier>node.id).name
+
+        const real_value = {
+            "type": "ClassBody",
+            "TYPE": "Class",
+            "value": node.body
+        }
+
+        assignVariables(context, name, real_value, node);
+
+        return null;
     },
 
     IfStatement: function*(node: es.IfStatement | es.ConditionalExpression, context: Context) {
