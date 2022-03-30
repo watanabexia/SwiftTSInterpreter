@@ -5,6 +5,9 @@ node_modules/@types/*
 node_modules/@types/estree/*
 !node_modules/@types/estree/index.d.ts
 
+src/lang/*
+!src/lang/Calc.g4
+
 *.js
 !docs/jsdoc/templates/**/*.js
 !docs/lib/**/*.js

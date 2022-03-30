@@ -274,9 +274,9 @@ export class ReturnTypeError implements SourceError {
 
   public explain() {
     return stripIndent`
-    Cannot convert return expression of type value of type '${typeToString(this.receivedType)}' to type '${typeToString(
-      this.expectedType
-    )}'
+    Cannot convert return expression of type value of type '${typeToString(
+      this.receivedType
+    )}' to type '${typeToString(this.expectedType)}'
     `
   }
 

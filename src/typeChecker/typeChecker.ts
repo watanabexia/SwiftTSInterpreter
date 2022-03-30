@@ -407,10 +407,7 @@ function cannotBeResolvedIfAddable(LHS: Variable, RHS: Type): boolean {
   return (
     LHS.constraint === 'addable' &&
     RHS.kind !== 'variable' &&
-    !(
-      RHS.kind === 'primitive' &&
-      (RHS.name === 'Int' || RHS.name === 'Double')
-    )
+    !(RHS.kind === 'primitive' && (RHS.name === 'Int' || RHS.name === 'Double'))
   )
 }
 
@@ -613,7 +610,7 @@ function infer(
     // console.log(env)
     // console.log("Constraint List >>>")
     // console.log(constraints)
-    console.log("Infer Type >>>")
+    console.log('Infer Type >>>')
     console.log(node)
 
     return _infer(node, env, constraints, isTopLevelAndLastValStmt)
@@ -638,7 +635,10 @@ function _infer(
     case 'UnaryExpression': {
       const op = node.operator === '-' ? NEGATIVE_OP : node.operator
       const envType = lookupType(op, env)!
-      const funcType = envType.kind === 'forall' ? extractFreeVariablesAndGenFresh(envType) as FunctionType : envType as FunctionType // in either case its a monomorphic type
+      const funcType =
+        envType.kind === 'forall'
+          ? (extractFreeVariablesAndGenFresh(envType) as FunctionType)
+          : (envType as FunctionType) // in either case its a monomorphic type
       const argNode = node.argument as TypeAnnotatedNode<es.Node>
       const argType = argNode.inferredType as Variable
       const receivedTypes: Type[] = []
@@ -696,7 +696,7 @@ function _infer(
       infer(node.argument!, env, constraints)
 
       //Debug
-      console.log("INFER RTN Stmt")
+      console.log('INFER RTN Stmt')
       console.log(argNode)
       console.log(storedType)
       console.log(argNode.inferredType)

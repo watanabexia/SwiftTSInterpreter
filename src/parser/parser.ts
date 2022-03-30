@@ -370,7 +370,8 @@ visitClassCall(ctx: ClassCallContext): es.CallExpression {
       type: 'CallExpression',
       callee: {
         type: 'Identifier',
-        name: <string>ctx._id.text
+        name: <string>ctx._id.text,
+        loc: contextToLocation(ctx)
       },
       arguments: [],
       loc: contextToLocation(ctx),

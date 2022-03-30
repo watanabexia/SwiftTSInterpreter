@@ -48,6 +48,14 @@ export function validateAndAnnotate(
     scopeHasCallExpressionMap.set(node, false)
   }
 
+  function processClass(node: es.ClassDeclaration) {
+    DeclarationMap.set(
+      node,
+      new Map((node.params as es.Identifier[]).map(id => [id.name, new Declaration(true)]))
+    )
+    DeclarationMap.get(node)?.set((<es.FunctionDeclaration>node).id!.name, new Declaration(true))
+  }
+
   // initialise scope of variables
   /* There are four kinds of scopes, for each scope it will initialize two Maps. 
      For program and block, the two Maps are empty.
@@ -58,6 +66,7 @@ export function validateAndAnnotate(
     BlockStatement: processBlock,
     FunctionDeclaration: processFunction,
     ArrowFunctionExpression: processFunction,
+    ClassDeclaration: processClass,
     ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
   })
 
@@ -145,7 +154,7 @@ export function validateAndAnnotate(
   }
 
   //Debug
-  // console.log("VALIDATE HERE")
+  console.log("VALIDATE HERE")
 
   ancestor(
     program,
@@ -187,7 +196,7 @@ export function validateAndAnnotate(
       },
       CallExpression(call: TypeAnnotatedNode<es.CallExpression>, ancestors: es.Node[]) {
         //Debug
-        // console.log(call)
+        console.log("VALIDATE CALL[1]")
 
         for (let i = ancestors.length - 1; i >= 0; i--) {
           const a = ancestors[i]
@@ -196,6 +205,9 @@ export function validateAndAnnotate(
             break
           }
         }
+
+        //Debug
+        console.log("VALIDATE CALL[2]")
 
         // call.typability = 'NotYetTyped'
       }
