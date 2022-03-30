@@ -42,7 +42,7 @@ import {
   ClassBodyContext,
   PropertyDefinitionContext,
   ClassCallContext,
-  MemberExpressionContext
+  MemberExpressionContext,
   FuncDeclareStatContext,
   Arg_typeContext,
   ReturnStatContext,
