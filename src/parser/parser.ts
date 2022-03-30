@@ -37,7 +37,12 @@ import {
   StringContext,
   DeclareValueStatContext,
   IfStatementContext,
-  BlockStatContext
+  BlockStatContext,
+  ClassDeclareStatContext,
+  ClassBodyContext,
+  PropertyDefinitionContext,
+  ClassCallContext,
+  MemberExpressionContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -344,6 +349,38 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
+  visitClassCall(ctx: ClassCallContext): es.CallExpression {
+    const ESTreeCallExpression: es.CallExpression = {
+      type: 'CallExpression',
+      callee: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      arguments: [],
+      loc: contextToLocation(ctx),
+      optional: false
+    }
+    return ESTreeCallExpression
+  }
+
+  visitMemberExpression(ctx: MemberExpressionContext): es.MemberExpression {
+    const ESTreeMemberExpression: es.MemberExpression = {
+      computed: false,
+      loc: contextToLocation(ctx),
+      object: {
+        type: 'Identifier',
+        name: <string>ctx._object.text
+      },
+      property: {
+        type: 'Identifier',
+        name: <string>ctx._property.text
+      },
+      type: "MemberExpression",
+      optional: false
+    }
+    return ESTreeMemberExpression
+  }
+
   visitExpression?: ((ctx: ExprContext) => es.Expression) | undefined
   visitStart?: ((ctx: StatContext) => es.Expression) | undefined
 
@@ -450,6 +487,21 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 
+  visitClassDeclareStat(ctx: ClassDeclareStatContext): es.ClassDeclaration {
+    const class_body_generator = new ClassBodyGenerator()
+    const ESTreeClassDeclaration: es.ClassDeclaration = {
+      body: ctx._body.accept(class_body_generator),
+      id: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      loc: contextToLocation(ctx),
+      superClass: undefined,
+      type: "ClassDeclaration"
+    }
+    return ESTreeClassDeclaration
+  }
+
   visit(tree: ParseTree): es.Statement {
     return tree.accept(this)
   }
@@ -508,6 +560,96 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
 
     return ESTreeProgram
+  }
+}
+
+class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
+  visitClassBody(ctx: ClassBodyContext): es.ClassBody {
+    const ESTreeClassBody: es.ClassBody = {
+      body: [],
+      loc: contextToLocation(ctx),
+      type: "ClassBody"
+    }
+
+    const generator = new PropertyDefinitionGenerator()
+    for (let i = 0; i < ctx.property_definition().length; i++) {
+      ESTreeClassBody.body.push(ctx.property_definition(i).accept(generator))
+    }
+
+    return ESTreeClassBody
+  }
+
+  visit(tree: ParseTree): es.ClassBody {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.ClassBody {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.ClassBody {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.ClassBody {
+    throw new FatalSyntaxError(
+        {
+          start: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine
+          },
+          end: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine + 1
+          }
+        },
+        `invalid syntax ${node.text}`
+    )
+  }
+}
+
+class PropertyDefinitionGenerator implements CalcVisitor<es.PropertyDefinition> {
+  visitPropertyDefinition(ctx: PropertyDefinitionContext): es.PropertyDefinition {
+    const generator = new ExpressionGenerator()
+    const ESTreePropertyDefinition: es.PropertyDefinition = {
+      type: "PropertyDefinition",
+      static: false,
+      computed: false,
+      key: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      value: ctx._value.accept(generator)
+    }
+    return ESTreePropertyDefinition
+  }
+
+  visit(tree: ParseTree): es.PropertyDefinition {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.PropertyDefinition {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.PropertyDefinition {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.PropertyDefinition {
+    throw new FatalSyntaxError(
+        {
+          start: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine
+          },
+          end: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine + 1
+          }
+        },
+        `invalid syntax ${node.text}`
+    )
   }
 }
 

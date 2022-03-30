@@ -37,6 +37,8 @@ STRING: 'String';
 FUNC: 'func';
 RTN: 'return';
 
+CLASS: 'class';
+
 IF: 'if';
 ELSE: 'else';
 ID: [a-zA-Z_] [a-zA-Z0-9_]*;
@@ -70,6 +72,12 @@ arg_type: id=ID ':' type=types ','?
 arg_value: id=ID ':' value=expr ','?
          ;
 
+class_body: '{' body=property_definition* '}'                                   # ClassBody
+          | '{\n' body=property_definition* '}'                                 # ClassBody
+          ;
+
+property_definition: VAR id=ID '=' value=expr stat_end   # PropertyDefinition;
+
 block_stat: '{' body=stat* '}'                                     # BlockStat
           | '{\n' body=stat* '}'                                   # BlockStat
           ;
@@ -81,6 +89,7 @@ stat: expression=expr stat_end                                                  
     | declare_type=declare_types id=ID '=' value=expr stat_end                          # DeclareValueStat
     | id=ID '=' value=expr stat_end                                                     # AssignStat
     | FUNC id=ID '(' argument=arg_type* ')' '->' type=types body=block_stat stat_end    # FuncDeclareStat
+    | CLASS id=ID (':' superclass=ID)? body=class_body stat_end                         # ClassDeclareStat
     | RTN value=expr stat_end                                                           # ReturnStat
     | NEWLINE                                                                           # EmptStat
     | NEWLINE EOF                                                                       # EmptStat
@@ -92,7 +101,9 @@ expr
    | TRUE                                               # True
    | FALSE                                              # False
    | STR                                                # String
-   | int=expr '.' frac=expr                             # Decimal
+   | id=ID '()'                                         # ClassCall
+   | object=ID '.' property=ID                          # MemberExpression
+   | int=NUMBER '.' frac=NUMBER                         # Decimal
    | '(' inner=expr ')'                                 # Parentheses
    | id=ID '(' argument=arg_value* ')'                  # FuncCall
    | left=expr operator=EQUAL right=expr                # Equal
