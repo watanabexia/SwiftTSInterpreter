@@ -38,6 +38,7 @@ FUNC: 'func';
 RTN: 'return';
 
 CLASS: 'class';
+PROTOCOL: 'protocol';
 
 IF: 'if';
 ELSE: 'else';
@@ -76,7 +77,21 @@ class_body: '{' body=property_definition* '}'                                   
           | '{\n' body=property_definition* '}'                                 # ClassBody
           ;
 
-property_definition: VAR id=ID '=' value=expr stat_end   # PropertyDefinition;
+protocol_body: '{' body=property_requirement* '}'                                   # ProtocolBody
+             | '{\n' body=property_requirement* '}'                                 # ProtocolBody
+             ;
+
+//definition: property_definition
+//          | method_definition
+//          ;
+
+property_definition: VAR id=ID '=' value=expr stat_end                         #PropertyDefinition
+                   ;
+
+//method_definition: FUNC id=ID value=expr stat_end #MethodDefinition
+//                 ;
+
+property_requirement: VAR id=ID ':' type=types '{' 'get' ('set')? '}' stat_end       #PropertyRequirement;
 
 block_stat: '{' body=stat* '}'                                     # BlockStat
           | '{\n' body=stat* '}'                                   # BlockStat
@@ -89,7 +104,8 @@ stat: expression=expr stat_end                                                  
     | declare_type=declare_types id=ID '=' value=expr stat_end                          # DeclareValueStat
     | id=ID '=' value=expr stat_end                                                     # AssignStat
     | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? body=block_stat stat_end # FuncDeclareStat
-    | CLASS id=ID (':' superclass=ID)? body=class_body stat_end                         # ClassDeclareStat
+    | CLASS id=ID (':' superclass=expr)? body=class_body stat_end                       # ClassDeclareStat
+    | PROTOCOL id=ID body=protocol_body stat_end                                        # ProtocolDeclareStat
     | RTN value=expr stat_end                                                           # ReturnStat
     | NEWLINE                                                                           # EmptStat
     | NEWLINE EOF                                                                       # EmptStat
@@ -103,7 +119,7 @@ expr
    | FALSE                                              # False
    | STR                                                # String
    | id=ID '()'                                         # ClassCall
-   | object=ID '.' property=ID                          # MemberExpression
+   | object=ID '.' property=expr                        # MemberExpression
    | int=NUMBER '.' frac=NUMBER                         # Decimal
    | '(' inner=expr ')'                                 # Parentheses
    | id=ID '(' argument=arg_value* ')'                  # FuncCall
