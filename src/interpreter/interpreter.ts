@@ -583,12 +583,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     ClassDeclaration: function*(node: es.ClassDeclaration, context: Context) {
         const name = (<es.Identifier>node.id).name
-        const superClass = (<es.Identifier>node.superClass).name
         const real_value = {
             "type": "ClassBody",
             "TYPE": "Class",
             "value": node.body,
-            "superClass": superClass
+            "superClass": node.superClass
         }
         assignVariables(context, name, real_value, node);
 
