@@ -5,6 +5,8 @@ node_modules/@types/*
 node_modules/@types/estree/*
 !node_modules/@types/estree/index.d.ts
 
+src/*
+!src/lang/
 src/lang/*
 !src/lang/Calc.g4
 

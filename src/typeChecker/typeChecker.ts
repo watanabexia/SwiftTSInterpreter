@@ -10,7 +10,8 @@ import {
   Type,
   FunctionType,
   SourceError,
-  TypeEnvironment
+  TypeEnvironment,
+  ClassType
 } from '../types'
 import {
   TypeError,
@@ -126,6 +127,12 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
       traverse(node.body)
       break
     }
+    case 'ClassDeclaration': {
+      node.body.body.forEach(element => {
+        traverse(element)
+      });
+      break
+    }
     case 'AssignmentExpression': {
       traverse(node.left, constraints)
       traverse(node.right, constraints)
@@ -133,8 +140,9 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
     }
     case 'ArrayExpression':
       throw Error('Array expressions not supported for x-slang')
-    case 'MemberExpression':
-      throw Error('Member expressions not supported for x-slang')
+    case 'MemberExpression': {
+      break
+    }
     default:
       return
   }
@@ -187,9 +195,9 @@ export function typeCheck(
   }
 
   //Debug
-  // console.log("FINAL Constraints >>>>>>>>>>>>>>>>>>")
-  // console.log(constraints)
-  // console.log(program)
+  console.log("FINAL Constraints >>>>>>>>>>>>>>>>>>")
+  console.log(constraints)
+  console.log(program)
 
   traverse(program, constraints)
 
@@ -242,6 +250,11 @@ function fresh(monoType: Type, subst: { [typeName: string]: Variable }): Type {
         parameterTypes: monoType.parameterTypes.map(argType => fresh(argType, subst)),
         returnType: fresh(monoType.returnType, subst)
       }
+    case 'class':
+      return {
+        ...monoType,
+        propertyTypes: monoType.propertyTypes.map(propType => fresh(propType, subst))
+      }
   }
 }
 
@@ -275,6 +288,10 @@ function freeTypeVarsInType(type: Type): Variable[] {
         }, []),
         freeTypeVarsInType(type.returnType)
       )
+    case 'class':
+      return type.propertyTypes.reduce((acc, currentType) => {
+          return union(acc, freeTypeVarsInType(currentType))
+        }, [])
   }
 }
 
@@ -352,6 +369,14 @@ function applyConstraints(type: Type, constraints: Constraint[]): Type {
         returnType: applyConstraints(type.returnType, constraints)
       }
     }
+    case 'class': {
+      return {
+        ...type,
+        propertyTypes: type.propertyTypes.map(fromType =>
+          applyConstraints(fromType, constraints)
+        )
+      }
+    }
   }
 }
 
@@ -377,6 +402,11 @@ function contains(type: Type, name: string): boolean {
         contains(currentType, name)
       )
       return containedInParamTypes || contains(type.returnType, name)
+    case 'class':
+      const containedInPropTypes = type.propertyTypes.some(currentType => 
+        contains(currentType, name)
+      )
+      return containedInPropTypes
   }
 }
 
@@ -798,7 +828,7 @@ function _infer(
       const lastEnvID = env.length - 1
 
       const newConstraints = addToConstraintList(constraints, [storedType, tUndef])
-      if (node.declarations[0].init === undefined) {
+      if (node.declarations[0].init === undefined) { // Primitive Type Declaration
         const v_type = node.declarations[0].TYPE
         const vType = getType(node, v_type)
 
@@ -806,7 +836,19 @@ function _infer(
         env[lastEnvID].declKindMap.set(v_name, vDType)
 
         return newConstraints
-      } else {
+
+      } else if (node.declarations[0].init!.type === 'CallExpression') { // This is a class
+        const CallNode = node.declarations[0].init! as es.CallExpression
+        const CalleeNode = CallNode.callee as es.Identifier
+        const c_name = CalleeNode.name as string
+        const cType = lookupType(c_name, env) as ClassType
+
+        env[lastEnvID].typeMap.set(v_name, cType)
+        env[lastEnvID].declKindMap.set(v_name, vDType)
+
+        return newConstraints
+
+      } else { // Primitive Value Declaration
         infer(node.declarations[0].init!, env, newConstraints)
 
         const initNode = node.declarations[0].init as TypeAnnotatedNode<es.Expression>
@@ -869,6 +911,47 @@ function _infer(
 
       return newConstraints
     }
+    case 'ClassDeclaration': {
+      //Debug
+      console.log("TYPE CHK Class Decl")
+
+      const name = node.id!.name
+      const PropertyNames = []
+      const PropertyTypes = []
+
+      for (let i = 0; i < node.body.body.length; i++) { 
+        switch (node.body.body[i].type) {
+          case 'PropertyDefinition':
+            const bodyNode = node.body.body[i] as TypeAnnotatedNode<es.PropertyDefinition>
+            infer(bodyNode, env, constraints)
+            const p_name = bodyNode.key.name
+            const p_Type = applyConstraints(bodyNode.inferredType!, constraints)
+            PropertyNames.push(p_name)
+            PropertyTypes.push(p_Type)
+            break
+          case 'MethodDefinition':
+            //TODO: Method type registration
+            break
+        }
+      }
+
+      const classType = tClass(PropertyNames, PropertyTypes)
+
+      env[env.length - 1].typeMap.set(name, classType)
+
+      return constraints
+    }
+    case 'PropertyDefinition': {
+      if (node.value !== null) {
+        const value = node.value as TypeAnnotatedNode<es.Expression>
+        infer(value, env, constraints)
+        return addToConstraintList(constraints, [storedType, value.inferredType!])
+      } else {
+        //TODO: What if it is a type declaration
+      }
+
+      return constraints
+    }
     case 'CallExpression': {
       const f_calleeNode = node.callee as es.Identifier
       const f_name = f_calleeNode.name
@@ -894,12 +977,6 @@ function _infer(
 
       arg_types.push(fRTNType)
       const argTypes = tFunc(...arg_types)
-
-      //Debug
-      // console.log("F TYPE CHECK")
-      // console.log(f_name)
-      // console.log(fType)
-      // console.log(argTypes)
 
       let newConstraints = constraints
 
@@ -956,8 +1033,23 @@ function _infer(
     }
     case 'ArrayExpression':
       throw Error('Array expressions not supported for x-slang')
-    case 'MemberExpression':
-      throw Error('Member expressions not supported for x-slang')
+    case 'MemberExpression': {
+      //Debug
+      console.log("TYPE CHK Mem Decl")
+
+      const ObjNode = node.object as es.Identifier
+      const obj_name = ObjNode.name as string
+      const PropNode = node.property as es.Identifier
+      const prop_name = PropNode.name as string
+      const objType = lookupType(obj_name, env) as ClassType
+      const PropertyNames = objType.propertyNames!
+      const PropertyTypes = objType.propertyTypes
+      const p_index = PropertyNames.indexOf(prop_name)
+      const p_Type = PropertyTypes[p_index]
+
+      return addToConstraintList(constraints, [storedType, p_Type])
+
+    }
     default:
       return addToConstraintList(constraints, [storedType, tUndef])
   }
@@ -1025,6 +1117,16 @@ function tFunc(...types: Type[]): FunctionType {
     kind: 'function',
     parameterTypes,
     returnType
+  }
+}
+
+function tClass(names: string[], types: Type[]): ClassType {
+  const propertyNames = names
+  const propertyTypes = types
+  return {
+    kind: 'class',
+    propertyNames,
+    propertyTypes
   }
 }
 

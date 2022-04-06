@@ -251,9 +251,6 @@ export async function runInContext(
   typeCheck(program, context)
 
   if (context.errors.length > 0) {
-    //Debug
-    console.log('failed to parse:')
-
     return resolvedErrorPromise
   }
 

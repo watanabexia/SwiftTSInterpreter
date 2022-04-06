@@ -48,7 +48,7 @@ import {
   ReturnStatContext,
   FuncCallContext,
   Arg_valueContext,
-  NegateContext,
+  NegateContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -365,7 +365,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-visitClassCall(ctx: ClassCallContext): es.CallExpression {
+  visitClassCall(ctx: ClassCallContext): es.CallExpression {
     const ESTreeCallExpression: es.CallExpression = {
       type: 'CallExpression',
       callee: {
@@ -397,7 +397,7 @@ visitClassCall(ctx: ClassCallContext): es.CallExpression {
     }
     return ESTreeMemberExpression
   }
-  
+
   visitFuncCall(ctx: FuncCallContext): es.CallExpression {
     const id_generator = new IdentifierGenerator()
     const ESTreeCallExpression: es.CallExpression = {
@@ -586,18 +586,18 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 
-
   visitClassDeclareStat(ctx: ClassDeclareStatContext): es.ClassDeclaration {
     const class_body_generator = new ClassBodyGenerator()
     const ESTreeClassDeclaration: es.ClassDeclaration = {
       body: ctx._body.accept(class_body_generator),
       id: {
         type: 'Identifier',
-        name: <string>ctx._id.text
+        name: <string>ctx._id.text,
+        loc: contextToLocation(ctx)
       },
       loc: contextToLocation(ctx),
       superClass: undefined,
-      type: "ClassDeclaration"
+      type: 'ClassDeclaration'
     }
     return ESTreeClassDeclaration
   }
@@ -610,7 +610,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
         type: 'Identifier',
         name: <string>ctx._id.text,
         loc: contextToLocation(ctx)
-
       },
       params: [],
       body: ctx._body.accept(blk_generator),
@@ -819,22 +818,20 @@ class BlockStatementGenerator implements CalcVisitor<es.BlockStatement> {
 
   visitErrorNode(node: ErrorNode): es.BlockStatement {
     throw new FatalSyntaxError(
-        {
-          start: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine
-          },
-          end: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine + 1
-          }
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
         },
-        `invalid syntax ${node.text}`
-  )
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
   }
 }
-
-
 
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
@@ -916,7 +913,6 @@ export function parse(source: string, context: Context) {
       //Debug
       // console.log('ESTree AST:')
       // console.log(program)
-
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
         //Debug
