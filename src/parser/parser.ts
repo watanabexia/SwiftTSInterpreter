@@ -743,7 +743,11 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
 
     const generator = new ClassStatGenerator()
     for (let i = 0; i < ctx.class_stat().length; i++) {
-      ESTreeClassBody.body.push(<es.MethodDefinition | es.PropertyDefinition | es.CompPropDeclaration> ctx.class_stat(i).accept(generator))
+      ESTreeClassBody.body.push(
+        <es.MethodDefinition | es.PropertyDefinition | es.CompPropDeclaration>(
+          ctx.class_stat(i).accept(generator)
+        )
+      )
     }
 
     return ESTreeClassBody
@@ -800,14 +804,14 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
       loc: contextToLocation(ctx),
       static: false,
       computed: false,
-      kind: <'let'|'var'> ctx._declare_type.text,
+      kind: <'let' | 'var'>ctx._declare_type.text,
       TYPE: ctx._type.text,
       key: {
         type: 'Identifier',
         loc: contextToLocation(ctx),
         name: <string>ctx._id.text
       },
-      body: <es.BlockStatement> this.visit(ctx._body)
+      body: <es.BlockStatement>this.visit(ctx._body)
     }
     return ESTreeCompPropDeclaration
   }
@@ -855,11 +859,13 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
       },
       body: ctx._body.accept(generator),
       TYPE: null,
-      params: [{
-        type: 'Identifier',
-        loc: contextToLocation(ctx),
-        name: ctx._input.text!
-      }]
+      params: [
+        {
+          type: 'Identifier',
+          loc: contextToLocation(ctx),
+          name: ctx._input.text!
+        }
+      ]
     }
     return ESTreeFunctionDeclaration
   }
