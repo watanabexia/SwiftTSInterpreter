@@ -48,35 +48,41 @@ export function validateAndAnnotate(
     scopeHasCallExpressionMap.set(node, false)
   }
 
+  function processClass(node: es.ClassDeclaration) {
+    DeclarationMap.set(node, new Map<string, Declaration>())
+    DeclarationMap.get(node)?.set((<es.ClassDeclaration>node).id!.name, new Declaration(true))
+  }
+
   // initialise scope of variables
   /* There are four kinds of scopes, for each scope it will initialize two Maps. 
      For program and block, the two Maps are empty.
      For functions, the parameters are initialized as NOT accessed before declaration. 
   */
-  ancestor(program as es.Node, {
+
+  const customWalker1 = {
+    ...base,
+    PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {}
+  }
+
+  ancestor(
+    program as es.Node, 
+    {
     Program: processBlock,
     BlockStatement: processBlock,
     FunctionDeclaration: processFunction,
+    ClassDeclaration: processClass,
     ArrowFunctionExpression: processFunction,
     ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
-  })
+    }, 
+    customWalker1
+  )
 
   function validateIdentifier(id: es.Identifier, ancestors: TypeAnnotatedNode<es.Node>[]) {
     const name = id.name
     let Found = false
-
-    //Debug
-    // console.log('VALID ID')
-
     for (let i = ancestors.length - 1; i >= 0; i--) {
       const a = ancestors[i]
       const map = DeclarationMap.get(a)
-
-      //Debug
-      // console.log('VALID ID - SUB')
-      // console.log(a)
-      // console.log(map)
-
       if (map?.has(name)) {
         Found = true
       }
@@ -87,9 +93,6 @@ export function validateAndAnnotate(
       // }
     }
     if (!Found) {
-      //Debug
-      // console.log("VALID ERROR UNFOUND")
-
       context.errors.push(new ParseUnfoundError(ancestors[ancestors.length - 1], name))
     } else {
       // ancestors[ancestors.length - 1].typability = 'NotYetTyped'
@@ -141,11 +144,9 @@ export function validateAndAnnotate(
           c(node.arguments[i].VALUE!, st, node.arguments[i].VALUE!.type)
         }
       }
-    }
+    },
+    PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {}
   }
-
-  //Debug
-  // console.log("VALIDATE HERE")
 
   ancestor(
     program,
@@ -185,9 +186,15 @@ export function validateAndAnnotate(
 
         node.typability = scopeHasCallExpressionMap.get(lastAncestor) ? 'Untypable' : 'NotYetTyped'
       },
+      ClassDeclaration(node: TypeAnnotatedNode<es.ClassDeclaration>, ancestors: es.Node[]) {
+        // Update available token
+        const lastAncestor = ancestors[ancestors.length - 2]
+        const name = node.id!.name
+        DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
+      },
       CallExpression(call: TypeAnnotatedNode<es.CallExpression>, ancestors: es.Node[]) {
         //Debug
-        // console.log(call)
+        // console.log('VALIDATE CALL[1]')
 
         for (let i = ancestors.length - 1; i >= 0; i--) {
           const a = ancestors[i]
@@ -196,6 +203,9 @@ export function validateAndAnnotate(
             break
           }
         }
+
+        //Debug
+        // console.log('VALIDATE CALL[2]')
 
         // call.typability = 'NotYetTyped'
       }
