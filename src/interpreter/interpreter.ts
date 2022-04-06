@@ -179,8 +179,8 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
         declareIdentifier(context, (statement.id as es.Identifier).name, statement)
         break
       case 'ProtocolDeclaration':
-          declareIdentifier(context, (statement.id as es.Identifier).name, statement)
-          break
+        declareIdentifier(context, (statement.id as es.Identifier).name, statement)
+        break
     }
   }
 }

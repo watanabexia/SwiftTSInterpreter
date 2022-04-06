@@ -53,10 +53,12 @@ import {
   CompPropBodyContext,
   GetStatContext,
   SetStatContext,
-  CompPropAssignStatContext
+  CompPropAssignStatContext,
   ProtocolDeclareStatContext,
   ProtocolBodyContext,
-  PropertyRequirementContext
+  PropertyRequirementContext,
+  CompPropEmptStatContext,
+  ClassEmptStatContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -595,13 +597,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
   }
 
   visitClassDeclareStat(ctx: ClassDeclareStatContext): es.ClassDeclaration {
-    const generator = new ExpressionGenerator()
-    let superClass
-    if (ctx._superclass == undefined) {
-      superClass = null
-    } else {
-      superClass = ctx._superclass.accept(generator)
-    }
     const class_body_generator = new ClassBodyGenerator()
     const ESTreeClassDeclaration: es.ClassDeclaration = {
       body: ctx._body.accept(class_body_generator),
@@ -611,9 +606,18 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
         loc: contextToLocation(ctx)
       },
       loc: contextToLocation(ctx),
-      superClass: superClass,
-      type: "ClassDeclaration"
+      superClass: null,
+      type: 'ClassDeclaration'
     }
+
+    if (ctx._superclass) {
+      ESTreeClassDeclaration.superClass = {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: ctx._superclass.text!
+      }
+    }
+
     return ESTreeClassDeclaration
   }
 
@@ -767,6 +771,10 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
 
     const generator = new ClassStatGenerator()
     for (let i = 0; i < ctx.class_stat().length; i++) {
+      //Debug
+      console.log('ClassBodyGenerator')
+      console.log(ctx.class_stat(i))
+
       ESTreeClassBody.body.push(
         <es.MethodDefinition | es.PropertyDefinition | es.CompPropDeclaration>(
           ctx.class_stat(i).accept(generator)
@@ -807,8 +815,12 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
 }
 
 class ClassStatGenerator implements CalcVisitor<es.Statement> {
-  visitPropertyDefinition(ctx: StorPropDeclStatContext): es.PropertyDefinition {
+  visitStorPropDeclStat(ctx: StorPropDeclStatContext): es.PropertyDefinition {
     const generator = new ExpressionGenerator()
+
+    //Debug
+    // console.log("StorePropDeclStatContext!!!!!>>>>>>")
+
     const ESTreePropertyDefinition: es.PropertyDefinition = {
       type: 'PropertyDefinition',
       static: false,
@@ -822,7 +834,7 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
     return ESTreePropertyDefinition
   }
 
-  visitCompPropDecl(ctx: CompPropDeclStatContext): es.CompPropDeclaration {
+  visitCompPropDeclStat(ctx: CompPropDeclStatContext): es.CompPropDeclaration {
     const ESTreeCompPropDeclaration: es.CompPropDeclaration = {
       type: 'CompPropDeclaration',
       loc: contextToLocation(ctx),
@@ -852,6 +864,20 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
     }
 
     return ESTreeBlockStatement
+  }
+
+  visitClassEmptStat(ctx: ClassEmptStatContext): es.EmptyStatement {
+    return {
+      type: 'EmptyStatement',
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitCompPropEmptStat(ctx: CompPropEmptStatContext): es.EmptyStatement {
+    return {
+      type: 'EmptyStatement',
+      loc: contextToLocation(ctx)
+    }
   }
 
   visitGetStat(ctx: GetStatContext): es.FunctionDeclaration {
@@ -952,17 +978,17 @@ class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
 
   visitErrorNode(node: ErrorNode): es.ProtocolBody {
     throw new FatalSyntaxError(
-        {
-          start: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine
-          },
-          end: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine + 1
-          }
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
         },
-        `invalid syntax ${node.text}`
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
     )
   }
 }
@@ -996,17 +1022,17 @@ class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement
 
   visitErrorNode(node: ErrorNode): es.PropertyRequirement {
     throw new FatalSyntaxError(
-        {
-          start: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine
-          },
-          end: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine + 1
-          }
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
         },
-        `invalid syntax ${node.text}`
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
     )
   }
 }
@@ -1070,12 +1096,12 @@ class ProgramGenerator implements CalcVisitor<es.Program> {
     const generator = new StatementGenerator()
     for (let i = 0; i < ctx.stat().length; i++) {
       //Debug
-      console.log(ctx.stat(i))
+      // console.log(ctx.stat(i))
 
       ESTreeProgram.body.push(ctx.stat(i).accept(generator))
 
       //Debug
-      console.log('Statement converted.')
+      // console.log('Statement converted.')
     }
 
     return ESTreeProgram
