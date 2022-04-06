@@ -607,7 +607,7 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       },
       loc: contextToLocation(ctx),
       superClass: null,
-      type: "ClassDeclaration"
+      type: 'ClassDeclaration'
     }
 
     if (ctx._superclass) {
@@ -771,9 +771,8 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
 
     const generator = new ClassStatGenerator()
     for (let i = 0; i < ctx.class_stat().length; i++) {
-
       //Debug
-      console.log("ClassBodyGenerator")
+      console.log('ClassBodyGenerator')
       console.log(ctx.class_stat(i))
 
       ESTreeClassBody.body.push(
@@ -979,17 +978,17 @@ class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
 
   visitErrorNode(node: ErrorNode): es.ProtocolBody {
     throw new FatalSyntaxError(
-        {
-          start: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine
-          },
-          end: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine + 1
-          }
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
         },
-        `invalid syntax ${node.text}`
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
     )
   }
 }
@@ -1023,17 +1022,17 @@ class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement
 
   visitErrorNode(node: ErrorNode): es.PropertyRequirement {
     throw new FatalSyntaxError(
-        {
-          start: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine
-          },
-          end: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine + 1
-          }
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
         },
-        `invalid syntax ${node.text}`
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
     )
   }
 }
@@ -1097,12 +1096,12 @@ class ProgramGenerator implements CalcVisitor<es.Program> {
     const generator = new StatementGenerator()
     for (let i = 0; i < ctx.stat().length; i++) {
       //Debug
-      console.log(ctx.stat(i))
+      // console.log(ctx.stat(i))
 
       ESTreeProgram.body.push(ctx.stat(i).accept(generator))
 
       //Debug
-      console.log('Statement converted.')
+      // console.log('Statement converted.')
     }
 
     return ESTreeProgram
