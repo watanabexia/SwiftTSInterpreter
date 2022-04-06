@@ -130,7 +130,7 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
     case 'ClassDeclaration': {
       node.body.body.forEach(element => {
         traverse(element)
-      });
+      })
       break
     }
     case 'AssignmentExpression': {
@@ -195,7 +195,7 @@ export function typeCheck(
   }
 
   //Debug
-  console.log("FINAL Constraints >>>>>>>>>>>>>>>>>>")
+  console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
   console.log(constraints)
   console.log(program)
 

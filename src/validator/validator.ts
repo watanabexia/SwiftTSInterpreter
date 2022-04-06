@@ -65,15 +65,15 @@ export function validateAndAnnotate(
   }
 
   ancestor(
-    program as es.Node, 
+    program as es.Node,
     {
-    Program: processBlock,
-    BlockStatement: processBlock,
-    FunctionDeclaration: processFunction,
-    ClassDeclaration: processClass,
-    ArrowFunctionExpression: processFunction,
-    ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
-    }, 
+      Program: processBlock,
+      BlockStatement: processBlock,
+      FunctionDeclaration: processFunction,
+      ClassDeclaration: processClass,
+      ArrowFunctionExpression: processFunction,
+      ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
+    },
     customWalker1
   )
 
