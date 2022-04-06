@@ -121,7 +121,6 @@ Methods
 */
 
 
-
 /*
 others
 */
@@ -151,7 +150,7 @@ expr
    | FALSE                                              # False
    | STR                                                # String
    | id=ID '()'                                         # ClassCall
-   | object=ID '.' property=ID                          # MemberExpression
+   | object=ID '.' property=expr                        # MemberExpression
    | int=NUMBER '.' frac=NUMBER                         # Decimal
    | '(' inner=expr ')'                                 # Parentheses
    | id=built_in '(' argument=expr ')'                  # BIFuncCall

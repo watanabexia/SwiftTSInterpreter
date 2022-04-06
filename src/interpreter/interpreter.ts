@@ -178,6 +178,9 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
       case 'ClassDeclaration':
         declareIdentifier(context, (statement.id as es.Identifier).name, statement)
         break
+      case 'ProtocolDeclaration':
+          declareIdentifier(context, (statement.id as es.Identifier).name, statement)
+          break
     }
   }
 }
@@ -580,13 +583,25 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     ClassDeclaration: function*(node: es.ClassDeclaration, context: Context) {
         const name = (<es.Identifier>node.id).name
-
         const real_value = {
             "type": "ClassBody",
             "TYPE": "Class",
+            "value": node.body,
+            "superClass": node.superClass
+        }
+        assignVariables(context, name, real_value, node);
+
+        return null;
+    },
+
+    ProtocolDeclaration: function*(node: es.ProtocolDeclaration, context: Context) {
+        const name = (<es.Identifier>node.id).name
+
+        const real_value = {
+            "type": "ProtocolBody",
+            "TYPE": "Protocol",
             "value": node.body
         }
-
         assignVariables(context, name, real_value, node);
 
         return null;
