@@ -130,7 +130,7 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
     case 'ClassDeclaration': {
       node.body.body.forEach(element => {
         traverse(element)
-      });
+      })
       break
     }
     case 'AssignmentExpression': {
@@ -195,7 +195,7 @@ export function typeCheck(
   }
 
   //Debug
-  console.log("FINAL Constraints >>>>>>>>>>>>>>>>>>")
+  console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
   console.log(constraints)
   console.log(program)
 
@@ -290,8 +290,8 @@ function freeTypeVarsInType(type: Type): Variable[] {
       )
     case 'class':
       return type.propertyTypes.reduce((acc, currentType) => {
-          return union(acc, freeTypeVarsInType(currentType))
-        }, [])
+        return union(acc, freeTypeVarsInType(currentType))
+      }, [])
   }
 }
 
@@ -372,9 +372,7 @@ function applyConstraints(type: Type, constraints: Constraint[]): Type {
     case 'class': {
       return {
         ...type,
-        propertyTypes: type.propertyTypes.map(fromType =>
-          applyConstraints(fromType, constraints)
-        )
+        propertyTypes: type.propertyTypes.map(fromType => applyConstraints(fromType, constraints))
       }
     }
   }
@@ -403,7 +401,7 @@ function contains(type: Type, name: string): boolean {
       )
       return containedInParamTypes || contains(type.returnType, name)
     case 'class':
-      const containedInPropTypes = type.propertyTypes.some(currentType => 
+      const containedInPropTypes = type.propertyTypes.some(currentType =>
         contains(currentType, name)
       )
       return containedInPropTypes
@@ -828,7 +826,8 @@ function _infer(
       const lastEnvID = env.length - 1
 
       const newConstraints = addToConstraintList(constraints, [storedType, tUndef])
-      if (node.declarations[0].init === undefined) { // Primitive Type Declaration
+      if (node.declarations[0].init === undefined) {
+        // Primitive Type Declaration
         const v_type = node.declarations[0].TYPE
         const vType = getType(node, v_type)
 
@@ -836,8 +835,8 @@ function _infer(
         env[lastEnvID].declKindMap.set(v_name, vDType)
 
         return newConstraints
-
-      } else if (node.declarations[0].init!.type === 'CallExpression') { // This is a class
+      } else if (node.declarations[0].init!.type === 'CallExpression') {
+        // This is a class
         const CallNode = node.declarations[0].init! as es.CallExpression
         const CalleeNode = CallNode.callee as es.Identifier
         const c_name = CalleeNode.name as string
@@ -847,8 +846,8 @@ function _infer(
         env[lastEnvID].declKindMap.set(v_name, vDType)
 
         return newConstraints
-
-      } else { // Primitive Value Declaration
+      } else {
+        // Primitive Value Declaration
         infer(node.declarations[0].init!, env, newConstraints)
 
         const initNode = node.declarations[0].init as TypeAnnotatedNode<es.Expression>
@@ -913,13 +912,13 @@ function _infer(
     }
     case 'ClassDeclaration': {
       //Debug
-      console.log("TYPE CHK Class Decl")
+      console.log('TYPE CHK Class Decl')
 
       const name = node.id!.name
       const PropertyNames = []
       const PropertyTypes = []
 
-      for (let i = 0; i < node.body.body.length; i++) { 
+      for (let i = 0; i < node.body.body.length; i++) {
         switch (node.body.body[i].type) {
           case 'PropertyDefinition':
             const bodyNode = node.body.body[i] as TypeAnnotatedNode<es.PropertyDefinition>
@@ -1035,7 +1034,7 @@ function _infer(
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression': {
       //Debug
-      console.log("TYPE CHK Mem Decl")
+      console.log('TYPE CHK Mem Decl')
 
       const ObjNode = node.object as es.Identifier
       const obj_name = ObjNode.name as string
@@ -1048,7 +1047,6 @@ function _infer(
       const p_Type = PropertyTypes[p_index]
 
       return addToConstraintList(constraints, [storedType, p_Type])
-
     }
     default:
       return addToConstraintList(constraints, [storedType, tUndef])

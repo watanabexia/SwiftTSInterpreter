@@ -40,7 +40,6 @@ import {
   BlockStatContext,
   ClassDeclareStatContext,
   ClassBodyContext,
-  PropertyDefinitionContext,
   ClassCallContext,
   MemberExpressionContext,
   FuncDeclareStatContext,
@@ -48,11 +47,16 @@ import {
   ReturnStatContext,
   FuncCallContext,
   Arg_valueContext,
+  NegateContext,
+  StorPropDeclStatContext,
+  CompPropDeclStatContext,
+  CompPropBodyContext,
+  GetStatContext,
+  SetStatContext,
+  CompPropAssignStatContext
   ProtocolDeclareStatContext,
   ProtocolBodyContext,
-  PropertyRequirementContext,
-  //MethodDefinitionContext
-  NegateContext
+  PropertyRequirementContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -721,6 +725,36 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
 
     return ESTreeProgram
   }
+
+  visitCompPropAssignStat(ctx: CompPropAssignStatContext): es.Statement {
+    const generator = new ExpressionGenerator()
+    return {
+      type: 'ExpressionStatement',
+      expression: {
+        type: 'AssignmentExpression',
+        operator: '=',
+        left: {
+          type: 'MemberExpression',
+          loc: contextToLocation(ctx),
+          object: {
+            type: 'Identifier',
+            loc: contextToLocation(ctx),
+            name: ctx._obj.text!
+          },
+          property: {
+            type: 'Identifier',
+            loc: contextToLocation(ctx),
+            name: ctx._prop.text!
+          },
+          computed: false,
+          optional: false
+        },
+        right: ctx._value.accept(generator),
+        loc: contextToLocation(ctx)
+      },
+      loc: contextToLocation(ctx)
+    }
+  }
 }
 
 class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
@@ -731,9 +765,13 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
       type: 'ClassBody'
     }
 
-    const generator = new PropertyDefinitionGenerator()
-    for (let i = 0; i < ctx.property_definition().length; i++) {
-      ESTreeClassBody.body.push(ctx.property_definition(i).accept(generator))
+    const generator = new ClassStatGenerator()
+    for (let i = 0; i < ctx.class_stat().length; i++) {
+      ESTreeClassBody.body.push(
+        <es.MethodDefinition | es.PropertyDefinition | es.CompPropDeclaration>(
+          ctx.class_stat(i).accept(generator)
+        )
+      )
     }
 
     return ESTreeClassBody
@@ -768,8 +806,8 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
   }
 }
 
-class PropertyDefinitionGenerator implements CalcVisitor<es.PropertyDefinition> {
-  visitPropertyDefinition(ctx: PropertyDefinitionContext): es.PropertyDefinition {
+class ClassStatGenerator implements CalcVisitor<es.Statement> {
+  visitPropertyDefinition(ctx: StorPropDeclStatContext): es.PropertyDefinition {
     const generator = new ExpressionGenerator()
     const ESTreePropertyDefinition: es.PropertyDefinition = {
       type: 'PropertyDefinition',
@@ -784,19 +822,91 @@ class PropertyDefinitionGenerator implements CalcVisitor<es.PropertyDefinition> 
     return ESTreePropertyDefinition
   }
 
-  visit(tree: ParseTree): es.PropertyDefinition {
+  visitCompPropDecl(ctx: CompPropDeclStatContext): es.CompPropDeclaration {
+    const ESTreeCompPropDeclaration: es.CompPropDeclaration = {
+      type: 'CompPropDeclaration',
+      loc: contextToLocation(ctx),
+      static: false,
+      computed: false,
+      kind: <'let' | 'var'>ctx._declare_type.text,
+      TYPE: ctx._type.text,
+      key: {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: <string>ctx._id.text
+      },
+      body: <es.BlockStatement>this.visit(ctx._body)
+    }
+    return ESTreeCompPropDeclaration
+  }
+
+  visitCompPropBody(ctx: CompPropBodyContext): es.BlockStatement {
+    const ESTreeBlockStatement: es.BlockStatement = {
+      type: 'BlockStatement',
+      loc: contextToLocation(ctx),
+      body: []
+    }
+
+    for (let i = 0; i < ctx.comp_prop_stat().length; i++) {
+      ESTreeBlockStatement.body.push(this.visit(ctx.comp_prop_stat(i)))
+    }
+
+    return ESTreeBlockStatement
+  }
+
+  visitGetStat(ctx: GetStatContext): es.FunctionDeclaration {
+    const generator = new BlockStatementGenerator()
+    const ESTreeFunctionDeclaration: es.FunctionDeclaration = {
+      type: 'FunctionDeclaration',
+      loc: contextToLocation(ctx),
+      id: {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: ctx._id.text!
+      },
+      body: ctx._body.accept(generator),
+      TYPE: null,
+      params: []
+    }
+    return ESTreeFunctionDeclaration
+  }
+
+  visitSetStat(ctx: SetStatContext): es.FunctionDeclaration {
+    const generator = new BlockStatementGenerator()
+    const ESTreeFunctionDeclaration: es.FunctionDeclaration = {
+      type: 'FunctionDeclaration',
+      loc: contextToLocation(ctx),
+      id: {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: ctx._id.text!
+      },
+      body: ctx._body.accept(generator),
+      TYPE: null,
+      params: [
+        {
+          type: 'Identifier',
+          loc: contextToLocation(ctx),
+          name: ctx._input.text!
+        }
+      ]
+    }
+    return ESTreeFunctionDeclaration
+  }
+
+  visit(tree: ParseTree): es.Statement {
     return tree.accept(this)
   }
 
-  visitChildren(node: RuleNode): es.PropertyDefinition {
+  visitChildren(node: RuleNode): es.Statement {
     return node.accept(this)
   }
 
-  visitTerminal(node: TerminalNode): es.PropertyDefinition {
+  visitTerminal(node: TerminalNode): es.Statement {
     return node.accept(this)
   }
 
-  visitErrorNode(node: ErrorNode): es.PropertyDefinition {
+  visitErrorNode(node: ErrorNode): es.Statement {
     throw new FatalSyntaxError(
       {
         start: {
@@ -960,12 +1070,12 @@ class ProgramGenerator implements CalcVisitor<es.Program> {
     const generator = new StatementGenerator()
     for (let i = 0; i < ctx.stat().length; i++) {
       //Debug
-      // console.log(ctx.stat(i))
+      console.log(ctx.stat(i))
 
       ESTreeProgram.body.push(ctx.stat(i).accept(generator))
 
       //Debug
-      // console.log('Statement converted.')
+      console.log('Statement converted.')
     }
 
     return ESTreeProgram
