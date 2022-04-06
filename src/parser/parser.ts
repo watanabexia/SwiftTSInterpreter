@@ -48,6 +48,10 @@ import {
   ReturnStatContext,
   FuncCallContext,
   Arg_valueContext,
+  ProtocolDeclareStatContext,
+  ProtocolBodyContext,
+  PropertyRequirementContext,
+  //MethodDefinitionContext
   NegateContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
@@ -587,6 +591,13 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
   }
 
   visitClassDeclareStat(ctx: ClassDeclareStatContext): es.ClassDeclaration {
+    const generator = new ExpressionGenerator()
+    let superClass
+    if (ctx._superclass == undefined) {
+      superClass = null
+    } else {
+      superClass = ctx._superclass.accept(generator)
+    }
     const class_body_generator = new ClassBodyGenerator()
     const ESTreeClassDeclaration: es.ClassDeclaration = {
       body: ctx._body.accept(class_body_generator),
@@ -596,10 +607,24 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
         loc: contextToLocation(ctx)
       },
       loc: contextToLocation(ctx),
-      superClass: undefined,
-      type: 'ClassDeclaration'
+      superClass: superClass,
+      type: "ClassDeclaration"
     }
     return ESTreeClassDeclaration
+  }
+
+  visitProtocolDeclareStat(ctx: ProtocolDeclareStatContext): es.ProtocolDeclaration {
+    const protocol_body_generator = new ProtocolBodyGenerator()
+    const ESTreeProtocolDeclaration: es.ProtocolDeclaration = {
+      body: ctx._body.accept(protocol_body_generator),
+      id: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      loc: contextToLocation(ctx),
+      type: 'ProtocolDeclaration'
+    }
+    return ESTreeProtocolDeclaration
   }
 
   visitFuncDeclareStat(ctx: FuncDeclareStatContext): es.FunctionDeclaration {
@@ -784,6 +809,94 @@ class PropertyDefinitionGenerator implements CalcVisitor<es.PropertyDefinition> 
         }
       },
       `invalid syntax ${node.text}`
+    )
+  }
+}
+class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
+  visitProtocolBody(ctx: ProtocolBodyContext): es.ProtocolBody {
+    const ESTreeProtocolBody: es.ProtocolBody = {
+      body: [],
+      loc: contextToLocation(ctx),
+      type: 'ProtocolBody'
+    }
+
+    const generator = new PropertyRequirementGenerator()
+    for (let i = 0; i < ctx.property_requirement().length; i++) {
+      ESTreeProtocolBody.body.push(ctx.property_requirement(i).accept(generator))
+    }
+
+    return ESTreeProtocolBody
+  }
+
+  visit(tree: ParseTree): es.ProtocolBody {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.ProtocolBody {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.ProtocolBody {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.ProtocolBody {
+    throw new FatalSyntaxError(
+        {
+          start: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine
+          },
+          end: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine + 1
+          }
+        },
+        `invalid syntax ${node.text}`
+    )
+  }
+}
+
+class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement> {
+  visitPropertyRequirement(ctx: PropertyRequirementContext): es.PropertyRequirement {
+    const ESTreePropertyRequirement: es.PropertyRequirement = {
+      type: 'PropertyRequirement',
+      static: false,
+      computed: false,
+      key: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      TYPE: <string>ctx._type.text
+    }
+    return ESTreePropertyRequirement
+  }
+
+  visit(tree: ParseTree): es.PropertyRequirement {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.PropertyRequirement {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.PropertyRequirement {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.PropertyRequirement {
+    throw new FatalSyntaxError(
+        {
+          start: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine
+          },
+          end: {
+            line: node.symbol.line,
+            column: node.symbol.charPositionInLine + 1
+          }
+        },
+        `invalid syntax ${node.text}`
     )
   }
 }
