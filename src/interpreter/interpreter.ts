@@ -5,9 +5,9 @@ import * as errors from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Frame, Value } from '../types'
 import {
-    evaluateBinaryExpression,
-    evaluateLogicalExpression,
-    evaluateUnaryExpression
+  evaluateBinaryExpression,
+  evaluateLogicalExpression,
+  evaluateUnaryExpression
 } from '../utils/operators'
 // import { primitive } from '../utils/astCreator'
 import * as rttc from '../utils/rttc'
@@ -186,7 +186,11 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
 }
 
 function assignVariables(context: Context, name: string, value: any, node: es.Node) {
-  const environment = currentEnvironment(context)
+  let environment = currentEnvironment(context)
+  while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
+    environment = environment.tail
+  }
+
   if (environment.head.hasOwnProperty(name)) {
     if (typeof environment.head[name] !== 'symbol') {
       const v_type = get_type(value)
@@ -218,11 +222,10 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 
 function evaluateIdentifier(context: Context, name: string, node: es.Node) {
   let environment = currentEnvironment(context)
-  while (environment.tail !== null 
-    && (!environment.head.hasOwnProperty(name))) {
-      environment = environment.tail
-    }
-  
+  while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
+    environment = environment.tail
+  }
+
   if (environment.head.hasOwnProperty(name)) {
     //Debug
     // console.log(environment.head[name])
@@ -388,7 +391,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
             //Debug
             // console.log(callee)
 
-            let arg_variables = []
+            const arg_variables = []
             for (let i = 0; i < args.length; i++) {
               const arg_value = yield* evaluate(args[i].VALUE!, context)
               const real_value = {

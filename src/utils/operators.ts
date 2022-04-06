@@ -160,6 +160,8 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return left / right
     case '%':
       return left % right
+    case '^':
+      return left ** right
     case '==':
       return left === right
     case '!=':

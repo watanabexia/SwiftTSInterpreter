@@ -244,7 +244,7 @@ export interface Typed {
   inferredType?: Type
 }
 
-export type Type = Primitive | Variable | FunctionType | List | Pair | SArray
+export type Type = Primitive | Variable | FunctionType | ClassType | List | Pair | SArray
 export type Constraint = 'none' | 'addable'
 
 export interface Primitive {
@@ -264,6 +264,12 @@ export interface FunctionType {
   parameterTypes: Type[]
   parameterNames?: string[]
   returnType: Type
+}
+
+export interface ClassType {
+  kind: 'class'
+  propertyNames?: string[]
+  propertyTypes: Type[]
 }
 
 export interface List {

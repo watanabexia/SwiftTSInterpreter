@@ -52,6 +52,7 @@ import {
   ProtocolBodyContext,
   PropertyRequirementContext,
   //MethodDefinitionContext
+  NegateContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -358,12 +359,23 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-visitClassCall(ctx: ClassCallContext): es.CallExpression {
+  visitNegate(ctx: NegateContext): es.Expression {
+    return {
+      type: 'UnaryExpression',
+      operator: '-',
+      prefix: true,
+      argument: this.visit(ctx._argument),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitClassCall(ctx: ClassCallContext): es.CallExpression {
     const ESTreeCallExpression: es.CallExpression = {
       type: 'CallExpression',
       callee: {
         type: 'Identifier',
-        name: <string>ctx._id.text
+        name: <string>ctx._id.text,
+        loc: contextToLocation(ctx)
       },
       arguments: [],
       loc: contextToLocation(ctx),
@@ -389,7 +401,7 @@ visitClassCall(ctx: ClassCallContext): es.CallExpression {
     }
     return ESTreeMemberExpression
   }
-  
+
   visitFuncCall(ctx: FuncCallContext): es.CallExpression {
     const id_generator = new IdentifierGenerator()
     const ESTreeCallExpression: es.CallExpression = {
@@ -410,6 +422,10 @@ visitClassCall(ctx: ClassCallContext): es.CallExpression {
 
     return ESTreeCallExpression
   }
+
+  // visitBIFuncCall(ctx: BIFuncCallContext): es.CallExpression {
+
+  // }
 
   visitExpression?: ((ctx: ExprContext) => es.Expression) | undefined
   visitStart?: ((ctx: StatContext) => es.Expression) | undefined
@@ -587,7 +603,8 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       body: ctx._body.accept(class_body_generator),
       id: {
         type: 'Identifier',
-        name: <string>ctx._id.text
+        name: <string>ctx._id.text,
+        loc: contextToLocation(ctx)
       },
       loc: contextToLocation(ctx),
       superClass: superClass,
@@ -624,7 +641,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
       TYPE: null,
       loc: contextToLocation(ctx)
     }
-
     if (ctx._type) {
       ESTreeFunctionDeclaration.TYPE = ctx._type.text
     }
@@ -915,22 +931,20 @@ class BlockStatementGenerator implements CalcVisitor<es.BlockStatement> {
 
   visitErrorNode(node: ErrorNode): es.BlockStatement {
     throw new FatalSyntaxError(
-        {
-          start: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine
-          },
-          end: {
-            line: node.symbol.line,
-            column: node.symbol.charPositionInLine + 1
-          }
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
         },
-        `invalid syntax ${node.text}`
-  )
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
   }
 }
-
-
 
 class ProgramGenerator implements CalcVisitor<es.Program> {
   visitProg(ctx: ProgContext): es.Program {
@@ -1010,8 +1024,8 @@ export function parse(source: string, context: Context) {
       program = convertProgram(tree) // Convert the ANTLR generated AST to human-friendly AST ESTree
 
       //Debug
-      console.log('ESTree AST:')
-      console.log(program)
+      // console.log('ESTree AST:')
+      // console.log(program)
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
         //Debug
