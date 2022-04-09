@@ -40,7 +40,6 @@ import {
   BlockStatContext,
   ClassDeclareStatContext,
   ClassBodyContext,
-  ClassCallContext,
   MemberExpressionContext,
   FuncDeclareStatContext,
   Arg_typeContext,
@@ -375,23 +374,9 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitClassCall(ctx: ClassCallContext): es.CallExpression {
-    const ESTreeCallExpression: es.CallExpression = {
-      type: 'CallExpression',
-      callee: {
-        type: 'Identifier',
-        name: <string>ctx._id.text,
-        loc: contextToLocation(ctx)
-      },
-      arguments: [],
-      loc: contextToLocation(ctx),
-      optional: false
-    }
-    return ESTreeCallExpression
-  }
-
   visitMemberExpression(ctx: MemberExpressionContext): es.MemberExpression {
     const ESTreeMemberExpression: es.MemberExpression = {
+      type: 'MemberExpression',
       computed: false,
       loc: contextToLocation(ctx),
       object: {
@@ -402,7 +387,6 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
         type: 'Identifier',
         name: <string>ctx._property.text
       },
-      type: 'MemberExpression',
       optional: false
     }
     return ESTreeMemberExpression
@@ -760,7 +744,6 @@ class StatementGenerator implements CalcVisitor<es.Statement> {
     }
   }
 }
-
 class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
   visitClassBody(ctx: ClassBodyContext): es.ClassBody {
     const ESTreeClassBody: es.ClassBody = {
@@ -772,8 +755,8 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
     const generator = new ClassStatGenerator()
     for (let i = 0; i < ctx.class_stat().length; i++) {
       //Debug
-      console.log('ClassBodyGenerator')
-      console.log(ctx.class_stat(i))
+      // console.log('ClassBodyGenerator')
+      // console.log(ctx.class_stat(i))
 
       ESTreeClassBody.body.push(
         <es.MethodDefinition | es.PropertyDefinition | es.CompPropDeclaration>(
@@ -829,7 +812,8 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
         type: 'Identifier',
         name: <string>ctx._id.text
       },
-      value: ctx._value.accept(generator)
+      value: ctx._value.accept(generator),
+      kind: <'let'|'var'> ctx._declare_type.text
     }
     return ESTreePropertyDefinition
   }
@@ -1003,8 +987,18 @@ class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement
         type: 'Identifier',
         name: <string>ctx._id.text
       },
-      TYPE: <string>ctx._type.text
+      kind: <'var' | 'let'> ctx._declare_type.text,
+      TYPE: <string>ctx._type.text,
+      get: false,
+      set: false
     }
+    if (ctx._get) {
+      ESTreePropertyRequirement.get = true
+    }
+    if (ctx._set) {
+      ESTreePropertyRequirement.set = true
+    }
+    
     return ESTreePropertyRequirement
   }
 

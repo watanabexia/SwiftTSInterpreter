@@ -90,7 +90,7 @@ protocol_body: '{' body=property_requirement* '}'                               
              | '{\n' body=property_requirement* '}'                                     # ProtocolBody
              ;
 
-property_requirement: declare_types id=ID ':' type=types ('{' 'get' ('set')? '}')? stat_end  # PropertyRequirement
+property_requirement: declare_type=declare_types id=ID ':' type=types '{' get='get' (set='set')? '}' stat_end  # PropertyRequirement
                     ;
 
 /*
@@ -149,7 +149,6 @@ expr
    | TRUE                                               # True
    | FALSE                                              # False
    | STR                                                # String
-   | id=ID '()'                                         # ClassCall
    | object=ID '.' property=expr                        # MemberExpression
    | int=NUMBER '.' frac=NUMBER                         # Decimal
    | '(' inner=expr ')'                                 # Parentheses

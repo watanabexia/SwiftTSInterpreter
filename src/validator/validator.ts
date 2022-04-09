@@ -51,6 +51,14 @@ export function validateAndAnnotate(
   function processClass(node: es.ClassDeclaration) {
     DeclarationMap.set(node, new Map<string, Declaration>())
     DeclarationMap.get(node)?.set((<es.ClassDeclaration>node).id!.name, new Declaration(true))
+
+    for (let i = 0; i < node.body.body.length; i++) {
+      const PNode = node.body.body[i]
+      if (PNode.type === 'PropertyDefinition') {
+        const storPropName = PNode.key.name
+        DeclarationMap.get(node)?.set(storPropName, new Declaration(true))
+      }
+    }
   }
 
   // initialise scope of variables
@@ -61,7 +69,29 @@ export function validateAndAnnotate(
 
   const customWalker1 = {
     ...base,
-    PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {}
+    ProtocolDeclaration(node: es.ProtocolDeclaration, st: never, c: FullWalkerCallback<never>) {},
+    ProtocolBody(node: es.ProtocolBody, st: never, c: FullWalkerCallback<never>) {
+      // if (node.body) {
+      //   for (let i = 0; i < node.body.length; i++) {
+      //     c(node.body[i], st, node.body[i].type)
+      //   }
+      // }
+    },
+    ClassDeclaration(node: es.ClassDeclaration, st:never, c:FullWalkerCallback<never>) {
+      if (node.body) {
+        if (node.body.body) {
+          for (let i = 0; i < node.body.body.length; i++) {
+            c(node.body.body[i], st, node.body.body[i].type)
+          }
+        }
+      }
+    },
+    PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {},
+    CompPropDeclaration(node: es.CompPropDeclaration, st:never, c:FullWalkerCallback<never>) {
+      if (node.body) {
+        c(node.body, st, "BlockStatement")
+      }
+    },
   }
 
   ancestor(
@@ -145,7 +175,39 @@ export function validateAndAnnotate(
         }
       }
     },
-    PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {}
+    PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {},
+    ProtocolDeclaration(node: es.ProtocolDeclaration, st: never, c: FullWalkerCallback<never>) {
+      // if (node.body) {
+      //   c(node.body, st, 'ProtocolBody')
+      // }
+    },
+    ProtocolBody(node: es.ProtocolBody, st: never, c: FullWalkerCallback<never>) {
+      // if (node.body) {
+      //   for (let i = 0; i < node.body.length; i++) {
+      //     c(node.body[i], st, node.body[i].type)
+      //   }
+      // }
+    },
+    CompPropDeclaration(node: es.CompPropDeclaration, st:never, c:FullWalkerCallback<never>) {
+      if (node.body) {
+
+        //Debug
+        // console.log("[validator: CompProp]")
+        // console.log(node)
+        // console.log(node.body)
+
+        for (let i = 0; i < node.body.body.length; i++) {
+          const fNode = node.body.body[i] as es.FunctionDeclaration
+          if (fNode.id!.name === 'get') {
+            fNode.TYPE = node.TYPE
+          } else if (fNode.id!.name === 'set') {
+            const input = fNode.params[0] as es.Identifier
+            input.TYPE = node.TYPE
+          }
+        }
+        c(node.body, st, 'BlockStatement')
+      }
+    }
   }
 
   ancestor(
@@ -192,6 +254,12 @@ export function validateAndAnnotate(
         const name = node.id!.name
         DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
       },
+      ProtocolDeclaration(node: TypeAnnotatedNode<es.ProtocolDeclaration>, ancestors: es.Node[]) {
+        // Update available token
+        const lastAncestor = ancestors[ancestors.length - 2]
+        const name = node.id!.name
+        DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
+      },
       CallExpression(call: TypeAnnotatedNode<es.CallExpression>, ancestors: es.Node[]) {
         //Debug
         // console.log('VALIDATE CALL[1]')
@@ -208,19 +276,7 @@ export function validateAndAnnotate(
         // console.log('VALIDATE CALL[2]')
 
         // call.typability = 'NotYetTyped'
-      }
-      // Literal(node: TypeAnnotatedNode<es.Literal>, ancestors: es.Node[]) {
-      //   node.typability = 'NotYetTyped'
-      // },
-      // Expression(node: TypeAnnotatedNode<es.Expression>, ancestors: es.Node[]) {
-      //   node.typability = 'NotYetTyped'
-      // },
-      // Statement(node: TypeAnnotatedNode<es.Statement>, ancestors: es.Node[]) {
-      //   node.typability = 'NotYetTyped'
-      // },
-      // Program(node: TypeAnnotatedNode<es.Program>, ancestors: es.Node[]) {
-      //   node.typability = 'NotYetTyped'
-      // }
+      },
     },
     customWalker
   )

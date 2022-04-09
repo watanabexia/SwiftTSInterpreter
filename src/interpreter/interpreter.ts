@@ -480,6 +480,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     VariableDeclaration: function*(node: es.VariableDeclaration, context: Context) {
         //Debug
         // console.log("[VariableDecla] !")
+        // console.log(node)
+        // console.log(node.declarations[0].init)
 
         const kind = node.kind
         let mutable = true

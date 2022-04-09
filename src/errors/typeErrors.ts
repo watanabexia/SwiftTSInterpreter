@@ -284,3 +284,84 @@ export class ReturnTypeError implements SourceError {
     return this.explain()
   }
 }
+
+export class MissingPropError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public className: string,
+    public protocol: string,
+    public propName: string,
+    public propType: Type
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Type '${this.className}' does not conform to protocol '${this.protocol}': requires property '${this.propName}' with type '${typeToString(
+      this.propType
+    )}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class MissingSetterError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public className: string,
+    public protocol: string,
+    public propName: string
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Type '${this.className}' does not conform to protocol '${this.protocol}': candidate '${this.propName}' is not settable, but protocol requires it
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class MissingGetterError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public className: string,
+    public protocol: string,
+    public propName: string
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Type '${this.className}' does not conform to protocol '${this.protocol}': candidate '${this.propName}' is not gettable, but protocol requires it
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
