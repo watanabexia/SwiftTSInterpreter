@@ -27,3 +27,4 @@ test-report.html
 *.DS_Store
 src/lang/.antlr/*
 test.swift
+test2.swift

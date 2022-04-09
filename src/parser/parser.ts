@@ -813,7 +813,7 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
         name: <string>ctx._id.text
       },
       value: ctx._value.accept(generator),
-      kind: <'let'|'var'> ctx._declare_type.text
+      kind: <'let' | 'var'>ctx._declare_type.text
     }
     return ESTreePropertyDefinition
   }
@@ -987,7 +987,7 @@ class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement
         type: 'Identifier',
         name: <string>ctx._id.text
       },
-      kind: <'var' | 'let'> ctx._declare_type.text,
+      kind: <'var' | 'let'>ctx._declare_type.text,
       TYPE: <string>ctx._type.text,
       get: false,
       set: false
@@ -998,7 +998,7 @@ class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement
     if (ctx._set) {
       ESTreePropertyRequirement.set = true
     }
-    
+
     return ESTreePropertyRequirement
   }
 

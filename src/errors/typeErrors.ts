@@ -303,9 +303,9 @@ export class MissingPropError implements SourceError {
 
   public explain() {
     return stripIndent`
-    Type '${this.className}' does not conform to protocol '${this.protocol}': requires property '${this.propName}' with type '${typeToString(
-      this.propType
-    )}'
+    Type '${this.className}' does not conform to protocol '${this.protocol}': requires property '${
+      this.propName
+    }' with type '${typeToString(this.propType)}'
     `
   }
 

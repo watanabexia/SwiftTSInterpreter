@@ -77,7 +77,7 @@ export function validateAndAnnotate(
       //   }
       // }
     },
-    ClassDeclaration(node: es.ClassDeclaration, st:never, c:FullWalkerCallback<never>) {
+    ClassDeclaration(node: es.ClassDeclaration, st: never, c: FullWalkerCallback<never>) {
       if (node.body) {
         if (node.body.body) {
           for (let i = 0; i < node.body.body.length; i++) {
@@ -87,11 +87,11 @@ export function validateAndAnnotate(
       }
     },
     PropertyDefinition(node: es.PropertyDefinition, st: never, c: FullWalkerCallback<never>) {},
-    CompPropDeclaration(node: es.CompPropDeclaration, st:never, c:FullWalkerCallback<never>) {
+    CompPropDeclaration(node: es.CompPropDeclaration, st: never, c: FullWalkerCallback<never>) {
       if (node.body) {
-        c(node.body, st, "BlockStatement")
+        c(node.body, st, 'BlockStatement')
       }
-    },
+    }
   }
 
   ancestor(
@@ -188,9 +188,8 @@ export function validateAndAnnotate(
       //   }
       // }
     },
-    CompPropDeclaration(node: es.CompPropDeclaration, st:never, c:FullWalkerCallback<never>) {
+    CompPropDeclaration(node: es.CompPropDeclaration, st: never, c: FullWalkerCallback<never>) {
       if (node.body) {
-
         //Debug
         // console.log("[validator: CompProp]")
         // console.log(node)
@@ -276,7 +275,7 @@ export function validateAndAnnotate(
         // console.log('VALIDATE CALL[2]')
 
         // call.typability = 'NotYetTyped'
-      },
+      }
     },
     customWalker
   )

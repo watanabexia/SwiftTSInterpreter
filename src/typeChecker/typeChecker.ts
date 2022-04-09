@@ -318,8 +318,8 @@ function freeTypeVarsInType(type: Type): Variable[] {
     case 'class':
       return union(
         type.storPropTypes.reduce((acc, currentType) => {
-        return union(acc, freeTypeVarsInType(currentType))
-      }, []), 
+          return union(acc, freeTypeVarsInType(currentType))
+        }, []),
         type.compPropTypes.reduce((acc, currentType) => {
           return union(acc, freeTypeVarsInType(currentType))
         }, [])
@@ -447,13 +447,12 @@ function contains(type: Type, name: string): boolean {
       const containedInStorPropTypes = type.storPropTypes.some(currentType =>
         contains(currentType, name)
       )
-      const containedInCompPropTypes = type.compPropTypes.some(currentType => 
+      const containedInCompPropTypes = type.compPropTypes.some(currentType =>
         contains(currentType, name)
       )
       return containedInStorPropTypes || containedInCompPropTypes
     case 'protocol':
-      const containedInPropTypes = type.PropTypes.some(currentType => 
-        contains(currentType, name))
+      const containedInPropTypes = type.PropTypes.some(currentType => contains(currentType, name))
       return containedInPropTypes
   }
 }
@@ -982,15 +981,12 @@ function _infer(
           PropDTypes.push(requirement.kind)
           Get.push(requirement.get)
           Set.push(requirement.set)
-        } else { // TODO: Method Requirement
+        } else {
+          // TODO: Method Requirement
         }
       }
 
-      const newProtocol = tProtocol(PropNames, 
-                                    PropTypes,
-                                    PropDTypes,
-                                    Get,
-                                    Set)
+      const newProtocol = tProtocol(PropNames, PropTypes, PropDTypes, Get, Set)
 
       //Debug
       // console.log("[PROTOCOL DEC TYPE CHECK]")
@@ -1015,17 +1011,17 @@ function _infer(
       pushEnv(env)
       for (let i = 0; i < node.body.body.length; i++) {
         if (node.body.body[i].type === 'PropertyDefinition') {
-            const bodyNode = node.body.body[i] as TypeAnnotatedNode<es.PropertyDefinition>
-            infer(bodyNode, env, constraints)
-            const p_name = bodyNode.key.name
-            const p_Type = applyConstraints(bodyNode.inferredType!, constraints)
-            const p_DType = bodyNode.kind
-            storPropNames.push(p_name)
-            storPropTypes.push(p_Type)
+          const bodyNode = node.body.body[i] as TypeAnnotatedNode<es.PropertyDefinition>
+          infer(bodyNode, env, constraints)
+          const p_name = bodyNode.key.name
+          const p_Type = applyConstraints(bodyNode.inferredType!, constraints)
+          const p_DType = bodyNode.kind
+          storPropNames.push(p_name)
+          storPropTypes.push(p_Type)
 
-            env[env.length - 1].typeMap.set(p_name, p_Type) // Register to the class env
-            env[env.length - 1].declKindMap.set(p_name, p_DType)
-            break
+          env[env.length - 1].typeMap.set(p_name, p_Type) // Register to the class env
+          env[env.length - 1].declKindMap.set(p_name, p_DType)
+          break
         }
       }
 
@@ -1052,9 +1048,9 @@ function _infer(
 
       //Protocol Check
       if (node.superClass !== null) {
-        const protocolName = (<es.Identifier> node.superClass).name
+        const protocolName = (<es.Identifier>node.superClass).name
         const protocolType = lookupType(protocolName, env) as Protocol
-        
+
         //Check Properties
         for (let i = 0; i < protocolType.PropNames.length; i++) {
           const propName = protocolType.PropNames[i]
@@ -1066,7 +1062,8 @@ function _infer(
           //Check stored properties
           let p_index = storPropNames.indexOf(propName)
           if (p_index !== -1) {
-          } else { // Check computed properties
+          } else {
+            // Check computed properties
             p_index = compPropNames.indexOf(propName)
             if (p_index !== -1) {
               const compProp = compProps[p_index]
@@ -1093,14 +1090,9 @@ function _infer(
             }
           }
         }
-
       }
 
-      const classType = tClass(name,
-                               storPropNames, 
-                               storPropTypes,
-                               compPropNames,
-                               compPropTypes)
+      const classType = tClass(name, storPropNames, storPropTypes, compPropNames, compPropTypes)
 
       env[env.length - 1].typeMap.set(name, classType)
 
@@ -1126,7 +1118,7 @@ function _infer(
         const fNode = node.body.body[i] as es.FunctionDeclaration
         newConstraints = infer(fNode, env, constraints)
       }
-      
+
       return newConstraints
     }
     case 'CallExpression': {
@@ -1159,7 +1151,9 @@ function _infer(
         let newConstraints = constraints
 
         if (argNames.length !== paramNames.length) {
-          typeErrors.push(new DifferentNumberArgumentsError(node, paramNames.length, argNames.length))
+          typeErrors.push(
+            new DifferentNumberArgumentsError(node, paramNames.length, argNames.length)
+          )
         } else if (isEqual(argNames, paramNames)) {
           try {
             newConstraints = addToConstraintList(constraints, [argTypes, fType])
@@ -1182,7 +1176,8 @@ function _infer(
         newConstraints = addToConstraintList(constraints, [storedType, fRTNType])
 
         return newConstraints
-      } else { // fType.kind === 'class'
+      } else {
+        // fType.kind === 'class'
         return addToConstraintList(constraints, [storedType, fType as ClassType])
       }
     }
@@ -1222,12 +1217,13 @@ function _infer(
       const prop_name = PropNode.name as string
       const objType = lookupType(obj_name, env) as ClassType
 
-      let p_Type:Type = tUndef
+      let p_Type: Type = tUndef
 
       //Check Stored Property
       const storPropNames = objType.storPropNames!
       let p_index = storPropNames.indexOf(prop_name)
-      if (p_index === -1) { // Check Computed Property
+      if (p_index === -1) {
+        // Check Computed Property
         const compPropNames = objType.compPropNames!
         p_index = compPropNames.indexOf(prop_name)
 
@@ -1236,7 +1232,6 @@ function _infer(
 
         const compPropTypes = objType.compPropTypes
         p_Type = compPropTypes[p_index]
-
       } else {
         const storPropTypes = objType.storPropTypes
         p_Type = storPropTypes[p_index]
@@ -1314,11 +1309,13 @@ function tFunc(...types: Type[]): FunctionType {
   }
 }
 
-function tClass(className: string,
-                storPropNames: string[], 
-                storPropTypes: Type[],
-                compPropNames: string[],
-                compPropTypes: Type[]): ClassType {
+function tClass(
+  className: string,
+  storPropNames: string[],
+  storPropTypes: Type[],
+  compPropNames: string[],
+  compPropTypes: Type[]
+): ClassType {
   return {
     kind: 'class',
     name: className,
@@ -1329,11 +1326,13 @@ function tClass(className: string,
   }
 }
 
-function tProtocol(PropNames: string[], 
-                   PropTypes: Type[],
-                   PropDTypes: string[],
-                   Get: boolean[],
-                   Set: boolean[]): Protocol {
+function tProtocol(
+  PropNames: string[],
+  PropTypes: Type[],
+  PropDTypes: string[],
+  Get: boolean[],
+  Set: boolean[]
+): Protocol {
   return {
     kind: 'protocol',
     PropNames,
