@@ -571,7 +571,9 @@ function statementReturnTypeCheck(node: es.Node, RTNType: Type, constraints: Con
       break
     }
     case 'BlockStatement': {
-      (<es.BlockStatement> node).body.map(stmt => statementReturnTypeCheck(stmt, RTNType, constraints))
+      ;(<es.BlockStatement>node).body.map(stmt =>
+        statementReturnTypeCheck(stmt, RTNType, constraints)
+      )
       break
     }
     case 'ReturnStatement': {
@@ -987,7 +989,7 @@ function _infer(
 
       if (RTNType.name !== 'Undefined' && statementHasReturn(node.body)) {
         //Debug
-        console.log("CHECKING RTN TYPE")
+        console.log('CHECKING RTN TYPE')
 
         statementReturnTypeCheck(node.body, RTNType, constraints)
       }
