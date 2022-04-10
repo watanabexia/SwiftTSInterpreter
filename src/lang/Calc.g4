@@ -35,6 +35,8 @@ BOOL: 'Bool';
 STRING: 'String';
 
 FUNC: 'func';
+REQUIRED: 'required';
+INIT: 'init';
 RTN: 'return';
 
 CLASS: 'class';
@@ -86,12 +88,15 @@ arg_value: id=ID ':' value=expr ','?
 /*
 Protocol
 */
-protocol_body: '{' body=property_requirement* '}'                                       # ProtocolBody
-             | '{\n' body=property_requirement* '}'                                     # ProtocolBody
+protocol_body: '{' body=protocol_stat* '}'                                       # ProtocolBody
+             | '{\n' body=protocol_stat* '}'                                     # ProtocolBody
              ;
 
-property_requirement: declare_type=declare_types id=ID ':' type=types '{' get='get' (set='set')? '}' stat_end  # PropertyRequirement
-                    ;
+protocol_stat: declare_type=declare_types id=ID ':' type=types '{' get='get' (set='set')? '}' stat_end?  # PropertyRequirement
+             | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? stat_end?                        # MethodRequirement
+             | INIT '(' argument=arg_type* ')' stat_end?                                                 # InitRequirement
+             | NEWLINE                                                                                   # EmptyRequirement
+             ;
 
 /*
 Class
@@ -101,7 +106,10 @@ class_body: '{' body=class_stat* '}'                                           #
           ;
 
 class_stat: declare_type=declare_types id=ID '=' value=expr stat_end?                             # StorPropDeclStat
-          | declare_type=declare_types id=ID ':' type=types body=comp_prop_block_stat  stat_end?  # CompPropDeclStat
+          | declare_type=declare_types id=ID ':' type=types stat_end?                             # StorPropTypeDeclStat
+          | declare_type=declare_types id=ID ':' type=types body=comp_prop_block_stat stat_end?   # CompPropDeclStat
+          | REQUIRED? INIT '(' argument=arg_type* ')' body=block_stat stat_end?                   # InitStat
+          | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? body=block_stat stat_end?    # MethodStat
           | NEWLINE                                                                               # ClassEmptStat
           ;
 
@@ -114,12 +122,8 @@ comp_prop_block_stat: '{' body=comp_prop_stat* '}'                     # CompPro
 
 comp_prop_stat: id='get' body=block_stat stat_end?                        # GetStat
               | id='set' '(' input=ID')' body=block_stat stat_end?        # SetStat
-              | NEWLINE                                                # CompPropEmptStat
+              | NEWLINE                                                   # CompPropEmptStat
               ;
-/*
-Methods
-*/
-
 
 /*
 others
@@ -128,19 +132,19 @@ block_stat: '{' body=stat* '}'                                                  
           | '{\n' body=stat* '}'                                                        # BlockStat
           ;
 
-stat: expression=expr stat_end                                                          # ExprStat
-    | IF test=expr consequent=block_stat (ELSE alternate=block_stat)? stat_end?         # IfStatement
-    | IF test=expr consequent=block_stat (ELSE alternate=stat)? stat_end?               # IfStatement
-    | declare_type=declare_types id=ID ':' type=types stat_end                          # DeclareStat
-    | declare_type=declare_types id=ID '=' value=expr stat_end                          # DeclareValueStat
-    | obj=ID '.' prop=ID '=' value=expr stat_end                                        # CompPropAssignStat
-    | id=ID '=' value=expr stat_end                                                     # AssignStat
-    | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? body=block_stat stat_end # FuncDeclareStat
-    | CLASS id=ID (':' superclass=ID)? body=class_body stat_end                         # ClassDeclareStat
-    | PROTOCOL id=ID body=protocol_body stat_end                                        # ProtocolDeclareStat
-    | RTN value=expr stat_end                                                           # ReturnStat
-    | NEWLINE                                                                           # EmptStat
-    | NEWLINE EOF                                                                       # EmptStat
+stat: expression=expr stat_end                                                           # ExprStat
+    | IF test=expr consequent=block_stat (ELSE alternate=block_stat)? stat_end?          # IfStatement
+    | IF test=expr consequent=block_stat (ELSE alternate=stat)? stat_end?                # IfStatement
+    | declare_type=declare_types id=ID ':' type=types stat_end?                          # DeclareStat
+    | declare_type=declare_types id=ID '=' value=expr stat_end?                          # DeclareValueStat
+    | obj=ID '.' prop=ID '=' value=expr stat_end?                                        # CompPropAssignStat
+    | id=ID '=' value=expr stat_end?                                                     # AssignStat
+    | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? body=block_stat stat_end? # FuncDeclareStat
+    | CLASS id=ID (':' superclass=ID)? body=class_body stat_end?                         # ClassDeclareStat
+    | PROTOCOL id=ID body=protocol_body stat_end?                                        # ProtocolDeclareStat
+    | RTN value=expr stat_end?                                                           # ReturnStat
+    | NEWLINE                                                                            # EmptStat
+    | NEWLINE EOF                                                                        # EmptStat
     ;
 
 expr
