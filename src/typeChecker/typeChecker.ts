@@ -11,7 +11,8 @@ import {
   FunctionType,
   SourceError,
   TypeEnvironment,
-  ClassType
+  ClassType,
+  Protocol
 } from '../types'
 import {
   TypeError,
@@ -27,7 +28,10 @@ import {
   AssignmentTypeError,
   DifferentNumberArgumentsError,
   IncorrectArgumentsLabelError,
-  ReturnTypeError
+  ReturnTypeError,
+  MissingPropError,
+  MissingSetterError,
+  MissingGetterError
 } from '../errors/typeErrors'
 
 /** Name of Unary negative builtin operator */
@@ -127,12 +131,6 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
       traverse(node.body)
       break
     }
-    case 'ClassDeclaration': {
-      node.body.body.forEach(element => {
-        traverse(element)
-      })
-      break
-    }
     case 'AssignmentExpression': {
       traverse(node.left, constraints)
       traverse(node.right, constraints)
@@ -141,6 +139,30 @@ function traverse(node: TypeAnnotatedNode<es.Node>, constraints?: Constraint[]) 
     case 'ArrayExpression':
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression': {
+      break
+    }
+    case 'ProtocolDeclaration': {
+      break
+    }
+    case 'ClassDeclaration': {
+      node.body.body.forEach(element => {
+        traverse(element)
+      })
+      break
+    }
+    case 'PropertyDefinition': {
+      traverse(node.key, constraints)
+      traverse(node.value, constraints)
+      break
+    }
+    case 'CompPropDeclaration': {
+      traverse(node.key, constraints)
+      node.body.body.forEach(element => {
+        traverse(element, constraints)
+      })
+      break
+    }
+    case 'MethodDefinition': {
       break
     }
     default:
@@ -196,8 +218,8 @@ export function typeCheck(
 
   //Debug
   console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
-  console.log(constraints)
-  console.log(program)
+  // console.log(constraints)
+  // console.log(program)
 
   traverse(program, constraints)
 
@@ -253,7 +275,12 @@ function fresh(monoType: Type, subst: { [typeName: string]: Variable }): Type {
     case 'class':
       return {
         ...monoType,
-        propertyTypes: monoType.propertyTypes.map(propType => fresh(propType, subst))
+        storPropTypes: monoType.storPropTypes.map(propType => fresh(propType, subst))
+      }
+    case 'protocol':
+      return {
+        ...monoType,
+        PropTypes: monoType.PropTypes.map(propType => fresh(propType, subst))
       }
   }
 }
@@ -289,7 +316,16 @@ function freeTypeVarsInType(type: Type): Variable[] {
         freeTypeVarsInType(type.returnType)
       )
     case 'class':
-      return type.propertyTypes.reduce((acc, currentType) => {
+      return union(
+        type.storPropTypes.reduce((acc, currentType) => {
+          return union(acc, freeTypeVarsInType(currentType))
+        }, []),
+        type.compPropTypes.reduce((acc, currentType) => {
+          return union(acc, freeTypeVarsInType(currentType))
+        }, [])
+      )
+    case 'protocol':
+      return type.PropTypes.reduce((acc, currentType) => {
         return union(acc, freeTypeVarsInType(currentType))
       }, [])
   }
@@ -372,7 +408,14 @@ function applyConstraints(type: Type, constraints: Constraint[]): Type {
     case 'class': {
       return {
         ...type,
-        propertyTypes: type.propertyTypes.map(fromType => applyConstraints(fromType, constraints))
+        storPropTypes: type.storPropTypes.map(fromType => applyConstraints(fromType, constraints)),
+        compPropTypes: type.compPropTypes.map(fromType => applyConstraints(fromType, constraints))
+      }
+    }
+    case 'protocol': {
+      return {
+        ...type,
+        PropTypes: type.PropTypes.map(fromType => applyConstraints(fromType, constraints))
       }
     }
   }
@@ -401,9 +444,15 @@ function contains(type: Type, name: string): boolean {
       )
       return containedInParamTypes || contains(type.returnType, name)
     case 'class':
-      const containedInPropTypes = type.propertyTypes.some(currentType =>
+      const containedInStorPropTypes = type.storPropTypes.some(currentType =>
         contains(currentType, name)
       )
+      const containedInCompPropTypes = type.compPropTypes.some(currentType =>
+        contains(currentType, name)
+      )
+      return containedInStorPropTypes || containedInCompPropTypes
+    case 'protocol':
+      const containedInPropTypes = type.PropTypes.some(currentType => contains(currentType, name))
       return containedInPropTypes
   }
 }
@@ -502,6 +551,12 @@ function addToConstraintList(constraints: Constraint[], [LHS, RHS]: [Type, Type]
   } else if (LHS.kind === 'array' && RHS.kind === 'array') {
     // if t = Array<T1> and t' = Array<T2>, add T1 = T2
     return addToConstraintList(constraints, [LHS.elementType, RHS.elementType])
+  } else if (LHS.kind === 'class' && RHS.kind === 'class') {
+    if (LHS.name !== RHS.name) {
+      throw new UnifyError(LHS, RHS)
+    } else {
+      return constraints
+    }
   }
   throw new UnifyError(LHS, RHS)
 }
@@ -724,10 +779,10 @@ function _infer(
       infer(node.argument!, env, constraints)
 
       //Debug
-      console.log('INFER RTN Stmt')
-      console.log(argNode)
-      console.log(storedType)
-      console.log(argNode.inferredType)
+      // console.log('INFER RTN Stmt')
+      // console.log(argNode)
+      // console.log(storedType)
+      // console.log(argNode.inferredType)
 
       return addToConstraintList(constraints, [storedType, argNode.inferredType!])
     }
@@ -910,31 +965,134 @@ function _infer(
 
       return newConstraints
     }
-    case 'ClassDeclaration': {
-      //Debug
-      console.log('TYPE CHK Class Decl')
-
+    case 'ProtocolDeclaration': {
       const name = node.id!.name
-      const PropertyNames = []
-      const PropertyTypes = []
-
-      for (let i = 0; i < node.body.body.length; i++) {
-        switch (node.body.body[i].type) {
-          case 'PropertyDefinition':
-            const bodyNode = node.body.body[i] as TypeAnnotatedNode<es.PropertyDefinition>
-            infer(bodyNode, env, constraints)
-            const p_name = bodyNode.key.name
-            const p_Type = applyConstraints(bodyNode.inferredType!, constraints)
-            PropertyNames.push(p_name)
-            PropertyTypes.push(p_Type)
-            break
-          case 'MethodDefinition':
-            //TODO: Method type registration
-            break
+      const requirements = node.body.body
+      const PropNames = []
+      const PropTypes = []
+      const PropDTypes = []
+      const Get = []
+      const Set = []
+      for (let i = 0; i < requirements.length; i++) {
+        const requirement = requirements[i]
+        if (requirement.type === 'PropertyRequirement') {
+          PropNames.push(requirement.key.name)
+          PropTypes.push(getType(node, requirement.TYPE))
+          PropDTypes.push(requirement.kind)
+          Get.push(requirement.get)
+          Set.push(requirement.set)
+        } else {
+          // TODO: Method Requirement
         }
       }
 
-      const classType = tClass(PropertyNames, PropertyTypes)
+      const newProtocol = tProtocol(PropNames, PropTypes, PropDTypes, Get, Set)
+
+      //Debug
+      // console.log("[PROTOCOL DEC TYPE CHECK]")
+      // console.log(newProtocol)
+
+      env[env.length - 1].typeMap.set(name, newProtocol)
+
+      return constraints
+    }
+    case 'ClassDeclaration': {
+      //Debug
+      // console.log('TYPE CHK Class Decl')
+
+      const name = node.id!.name
+      const storPropNames = []
+      const storPropTypes = []
+      const compProps = []
+      const compPropNames = []
+      const compPropTypes = []
+
+      //TypeCheck & Register Stored Property
+      pushEnv(env)
+      for (let i = 0; i < node.body.body.length; i++) {
+        if (node.body.body[i].type === 'PropertyDefinition') {
+          const bodyNode = node.body.body[i] as TypeAnnotatedNode<es.PropertyDefinition>
+          infer(bodyNode, env, constraints)
+          const p_name = bodyNode.key.name
+          const p_Type = applyConstraints(bodyNode.inferredType!, constraints)
+          const p_DType = bodyNode.kind
+          storPropNames.push(p_name)
+          storPropTypes.push(p_Type)
+
+          env[env.length - 1].typeMap.set(p_name, p_Type) // Register to the class env
+          env[env.length - 1].declKindMap.set(p_name, p_DType)
+          break
+        }
+      }
+
+      //Typecheck Computed Property and Methods
+      for (let i = 0; i < node.body.body.length; i++) {
+        switch (node.body.body[i].type) {
+          case 'PropertyDefinition':
+            break //skip for stored property
+          case 'MethodDefinition':
+            //TODO: Method type registration
+            break
+          case 'CompPropDeclaration':
+            const compNode = node.body.body[i] as TypeAnnotatedNode<es.CompPropDeclaration>
+            infer(compNode, env, constraints)
+            const cp_name = compNode.key.name
+            const cp_Type = applyConstraints(compNode.inferredType!, constraints)
+            compPropNames.push(cp_name)
+            compPropTypes.push(cp_Type)
+            compProps.push(compNode)
+            break
+        }
+      }
+      env.pop()
+
+      //Protocol Check
+      if (node.superClass !== null) {
+        const protocolName = (<es.Identifier>node.superClass).name
+        const protocolType = lookupType(protocolName, env) as Protocol
+
+        //Check Properties
+        for (let i = 0; i < protocolType.PropNames.length; i++) {
+          const propName = protocolType.PropNames[i]
+          const propType = protocolType.PropTypes[i]
+          // const propDType = protocolType.PropDTypes[i]
+          const Get = protocolType.Get[i]
+          const Set = protocolType.Set[i]
+
+          //Check stored properties
+          let p_index = storPropNames.indexOf(propName)
+          if (p_index !== -1) {
+          } else {
+            // Check computed properties
+            p_index = compPropNames.indexOf(propName)
+            if (p_index !== -1) {
+              const compProp = compProps[p_index]
+              const compPropBody = compProp.body.body as es.FunctionDeclaration[]
+              let has_get = false
+              let has_set = false
+              for (let i = 0; i < compPropBody.length; i++) {
+                const f = compPropBody[i]
+                if (f.id!.name === 'get') {
+                  has_get = true
+                } else if (f.id!.name === 'set') {
+                  has_set = true
+                }
+              }
+              if (has_get === false && Get === true) {
+                typeErrors.push(new MissingGetterError(compProp, name, protocolName, propName))
+              }
+
+              if (has_set === false && Set === true) {
+                typeErrors.push(new MissingSetterError(compProp, name, protocolName, propName))
+              }
+            } else {
+              typeErrors.push(new MissingPropError(node, name, protocolName, propName, propType))
+            }
+          }
+        }
+      }
+
+      const classType = tClass(name, storPropNames, storPropTypes, compPropNames, compPropTypes)
 
       env[env.length - 1].typeMap.set(name, classType)
 
@@ -951,60 +1109,77 @@ function _infer(
 
       return constraints
     }
+    case 'CompPropDeclaration': {
+      const Type = getType(node, node.TYPE)
+
+      let newConstraints = addToConstraintList(constraints, [storedType, Type])
+
+      for (let i = 0; i < node.body.body.length; i++) {
+        const fNode = node.body.body[i] as es.FunctionDeclaration
+        newConstraints = infer(fNode, env, constraints)
+      }
+
+      return newConstraints
+    }
     case 'CallExpression': {
       const f_calleeNode = node.callee as es.Identifier
       const f_name = f_calleeNode.name
-      const fType = lookupType(f_name, env)! as FunctionType
+      const fType = lookupType(f_name, env)!
 
-      const paramNames = fType.parameterNames!
-      const paramTypes = fType.parameterTypes
-      const fRTNType = fType.returnType
+      if (fType.kind === 'function') {
+        const paramNames = fType.parameterNames!
+        const paramTypes = fType.parameterTypes
+        const fRTNType = fType.returnType
 
-      // let argValues = []
-      const arg_types: Type[] = []
-      const argNames = []
+        // let argValues = []
+        const arg_types: Type[] = []
+        const argNames = []
 
-      for (let i = 0; i < node.arguments.length; i++) {
-        const arg = node.arguments[i] as es.Identifier
-        argNames.push(arg.name)
+        for (let i = 0; i < node.arguments.length; i++) {
+          const arg = node.arguments[i] as es.Identifier
+          argNames.push(arg.name)
 
-        const arg_value = arg.VALUE as TypeAnnotatedNode<es.Expression>
-        infer(arg_value, env, constraints)
-        // argValues.push(arg_value)
-        arg_types.push(arg_value.inferredType!)
-      }
-
-      arg_types.push(fRTNType)
-      const argTypes = tFunc(...arg_types)
-
-      let newConstraints = constraints
-
-      if (argNames.length !== paramNames.length) {
-        typeErrors.push(new DifferentNumberArgumentsError(node, paramNames.length, argNames.length))
-      } else if (isEqual(argNames, paramNames)) {
-        try {
-          newConstraints = addToConstraintList(constraints, [argTypes, fType])
-        } catch (e) {
-          if (e instanceof UnifyError) {
-            typeErrors.push(
-              new InvalidArgumentTypesError(
-                node,
-                node.arguments,
-                paramTypes,
-                argTypes.parameterTypes.map(pType => applyConstraints(pType, constraints))
-              )
-            )
-          }
+          const arg_value = arg.VALUE as TypeAnnotatedNode<es.Expression>
+          infer(arg_value, env, constraints)
+          // argValues.push(arg_value)
+          arg_types.push(arg_value.inferredType!)
         }
+
+        arg_types.push(fRTNType)
+        const argTypes = tFunc(...arg_types)
+
+        let newConstraints = constraints
+
+        if (argNames.length !== paramNames.length) {
+          typeErrors.push(
+            new DifferentNumberArgumentsError(node, paramNames.length, argNames.length)
+          )
+        } else if (isEqual(argNames, paramNames)) {
+          try {
+            newConstraints = addToConstraintList(constraints, [argTypes, fType])
+          } catch (e) {
+            if (e instanceof UnifyError) {
+              typeErrors.push(
+                new InvalidArgumentTypesError(
+                  node,
+                  node.arguments,
+                  paramTypes,
+                  argTypes.parameterTypes.map(pType => applyConstraints(pType, constraints))
+                )
+              )
+            }
+          }
+        } else {
+          typeErrors.push(new IncorrectArgumentsLabelError(node, argNames, paramNames))
+        }
+
+        newConstraints = addToConstraintList(constraints, [storedType, fRTNType])
+
+        return newConstraints
       } else {
-        typeErrors.push(new IncorrectArgumentsLabelError(node, argNames, paramNames))
+        // fType.kind === 'class'
+        return addToConstraintList(constraints, [storedType, fType as ClassType])
       }
-
-      newConstraints = addToConstraintList(constraints, [storedType, fRTNType])
-
-      return newConstraints
-
-      // throw Error('Call expressions not supported for x-slang')
     }
     case 'AssignmentExpression': {
       let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
@@ -1034,17 +1209,33 @@ function _infer(
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression': {
       //Debug
-      console.log('TYPE CHK Mem Decl')
+      // console.log('TYPE CHK Mem Decl')
 
       const ObjNode = node.object as es.Identifier
       const obj_name = ObjNode.name as string
       const PropNode = node.property as es.Identifier
       const prop_name = PropNode.name as string
       const objType = lookupType(obj_name, env) as ClassType
-      const PropertyNames = objType.propertyNames!
-      const PropertyTypes = objType.propertyTypes
-      const p_index = PropertyNames.indexOf(prop_name)
-      const p_Type = PropertyTypes[p_index]
+
+      let p_Type: Type = tUndef
+
+      //Check Stored Property
+      const storPropNames = objType.storPropNames!
+      let p_index = storPropNames.indexOf(prop_name)
+      if (p_index === -1) {
+        // Check Computed Property
+        const compPropNames = objType.compPropNames!
+        p_index = compPropNames.indexOf(prop_name)
+
+        // if (p_index === -1) TODO: Check Method
+        // else
+
+        const compPropTypes = objType.compPropTypes
+        p_Type = compPropTypes[p_index]
+      } else {
+        const storPropTypes = objType.storPropTypes
+        p_Type = storPropTypes[p_index]
+      }
 
       return addToConstraintList(constraints, [storedType, p_Type])
     }
@@ -1118,13 +1309,37 @@ function tFunc(...types: Type[]): FunctionType {
   }
 }
 
-function tClass(names: string[], types: Type[]): ClassType {
-  const propertyNames = names
-  const propertyTypes = types
+function tClass(
+  className: string,
+  storPropNames: string[],
+  storPropTypes: Type[],
+  compPropNames: string[],
+  compPropTypes: Type[]
+): ClassType {
   return {
     kind: 'class',
-    propertyNames,
-    propertyTypes
+    name: className,
+    storPropNames,
+    storPropTypes,
+    compPropNames,
+    compPropTypes
+  }
+}
+
+function tProtocol(
+  PropNames: string[],
+  PropTypes: Type[],
+  PropDTypes: string[],
+  Get: boolean[],
+  Set: boolean[]
+): Protocol {
+  return {
+    kind: 'protocol',
+    PropNames,
+    PropTypes,
+    PropDTypes,
+    Get,
+    Set
   }
 }
 

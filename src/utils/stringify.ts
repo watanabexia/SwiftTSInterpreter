@@ -207,6 +207,8 @@ function niceTypeToString(type: Type, nameMap = { _next: 0 }): string {
         parametersString = `(${parametersString})`
       }
       return `${parametersString} -> ${curriedTypeToString(type.returnType)}`
+    case 'class':
+      return type.name
     default:
       return 'Unable to infer type'
   }

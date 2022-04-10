@@ -244,7 +244,7 @@ export interface Typed {
   inferredType?: Type
 }
 
-export type Type = Primitive | Variable | FunctionType | ClassType | List | Pair | SArray
+export type Type = Primitive | Variable | FunctionType | ClassType | List | Pair | SArray | Protocol
 export type Constraint = 'none' | 'addable'
 
 export interface Primitive {
@@ -268,8 +268,23 @@ export interface FunctionType {
 
 export interface ClassType {
   kind: 'class'
-  propertyNames?: string[]
-  propertyTypes: Type[]
+  name: string
+  storPropNames?: string[]
+  storPropTypes: Type[]
+  compPropNames?: string[]
+  compPropTypes: Type[]
+  // methodNames?: string[]
+  // methodTypes: FunctionType[]
+}
+
+export interface Protocol {
+  kind: 'protocol'
+  PropNames: string[]
+  PropTypes: Type[]
+  PropDTypes: string[]
+  Get: boolean[]
+  Set: boolean[]
+  // mutating: boolean[]
 }
 
 export interface List {
