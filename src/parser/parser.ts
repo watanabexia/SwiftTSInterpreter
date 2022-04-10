@@ -942,7 +942,7 @@ class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
 
     const generator = new PropertyStatGenerator()
     for (let i = 0; i < ctx.protocol_stat().length; i++) {
-      ESTreeProtocolBody.body.push(<es.Requirement> ctx.protocol_stat(i).accept(generator))
+      ESTreeProtocolBody.body.push(<es.Requirement>ctx.protocol_stat(i).accept(generator))
     }
 
     return ESTreeProtocolBody
