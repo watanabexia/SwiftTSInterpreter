@@ -217,7 +217,7 @@ export function typeCheck(
   }
 
   //Debug
-  console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
+  // console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
   // console.log(constraints)
   // console.log(program)
 
@@ -561,6 +561,40 @@ function addToConstraintList(constraints: Constraint[], [LHS, RHS]: [Type, Type]
   throw new UnifyError(LHS, RHS)
 }
 
+function statementReturnTypeCheck(node: es.Node, RTNType: Type, constraints: Constraint[]) {
+  switch (node.type) {
+    case 'IfStatement': {
+      statementReturnTypeCheck(node.consequent, RTNType, constraints)
+      if (node.alternate) {
+        statementReturnTypeCheck(node.alternate!, RTNType, constraints)
+      }
+      break
+    }
+    case 'BlockStatement': {
+      (<es.BlockStatement> node).body.map(stmt => statementReturnTypeCheck(stmt, RTNType, constraints))
+      break
+    }
+    case 'ReturnStatement': {
+      const RTNNode = node as TypeAnnotatedNode<es.ReturnStatement>
+
+      //Debug
+      // console.log("RTN Detected!")
+      // console.log(RTNNode)
+      // console.log(constraints)
+
+      try {
+        addToConstraintList(constraints, [RTNType, RTNNode.inferredType!])
+      } catch (e) {
+        const received_Type = applyConstraints(RTNNode.inferredType!, constraints)
+        if (e instanceof UnifyError) {
+          typeErrors.push(new ReturnTypeError(node, RTNType, received_Type))
+        }
+      }
+      break
+    }
+  }
+}
+
 function statementHasReturn(node: es.Node): boolean {
   switch (node.type) {
     case 'IfStatement': {
@@ -693,8 +727,8 @@ function infer(
     // console.log(env)
     // console.log("Constraint List >>>")
     // console.log(constraints)
-    console.log('Infer Type >>>')
-    console.log(node)
+    // console.log('Infer Type >>>')
+    // console.log(node)
 
     return _infer(node, env, constraints, isTopLevelAndLastValStmt)
   } catch (e) {
@@ -915,6 +949,9 @@ function _infer(
       }
     }
     case 'FunctionDeclaration': {
+      //Debug
+      console.log('[TYPE CHECK FUNC DECLARE]')
+
       const f_nameNode = node.id as es.Identifier
       const f_name = f_nameNode.name
       const RTN_Type = node.TYPE
@@ -949,18 +986,10 @@ function _infer(
       env.pop()
 
       if (RTNType.name !== 'Undefined' && statementHasReturn(node.body)) {
-        const RTNIndex = returnBlockValueNodeIndexFor(node.body, false)
-        const RTNStmt = node.body.body[RTNIndex] as TypeAnnotatedNode<es.ReturnStatement>
-        const RTNStmtType = RTNStmt.inferredType!
+        //Debug
+        console.log("CHECKING RTN TYPE")
 
-        try {
-          newConstraints = addToConstraintList(constraints, [RTNType, RTNStmtType])
-        } catch (e) {
-          const received_Type = applyConstraints(RTNStmtType, constraints)
-          if (e instanceof UnifyError) {
-            typeErrors.push(new ReturnTypeError(node, RTNType, received_Type))
-          }
-        }
+        statementReturnTypeCheck(node.body, RTNType, constraints)
       }
 
       return newConstraints
