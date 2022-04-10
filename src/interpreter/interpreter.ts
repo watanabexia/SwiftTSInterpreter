@@ -147,8 +147,8 @@ function get_type(value: any) {
 }
 
 function declareIdentifier(context: Context, name: string, node: es.Node) {
-    //Debug
-    console.log("[declareIdentifier] name: " + name)
+  //Debug
+  console.log('[declareIdentifier] name: ' + name)
   const environment = currentEnvironment(context)
   if (environment.head.hasOwnProperty(name)) {
     const descriptors = Object.getOwnPropertyDescriptors(environment.head)
@@ -174,8 +174,8 @@ function declareVariables(context: Context, node: es.VariableDeclaration) {
 }
 
 function declareFunctionsAndVariables(context: Context, node: es.BlockStatement) {
-    //Debug
-    console.log("[declareFunctionsAndVariables]")
+  //Debug
+  console.log('[declareFunctionsAndVariables]')
   for (const statement of node.body) {
     switch (statement.type) {
       case 'VariableDeclaration':
@@ -198,8 +198,8 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
 }
 
 function assignVariables(context: Context, name: string, value: any, node: es.Node) {
-    //Debug
-    console.log("[assignVariables] name: " + name)
+  //Debug
+  console.log('[assignVariables] name: ' + name)
   let environment = currentEnvironment(context)
   while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
     environment = environment.tail
@@ -235,20 +235,20 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 }
 
 function findClassProperty(context: Context, name: string, node: es.Node) {
-    let currentClassNode
+  let currentClassNode
 
-    if(currentClass != null){
-        currentClassNode = evaluateIdentifier(context, currentClass, node)
+  if (currentClass != null) {
+    currentClassNode = evaluateIdentifier(context, currentClass, node)
 
-        const classProperties = currentClassNode.value.body
+    const classProperties = currentClassNode.value.body
 
-        for (const property of classProperties) {
-            if (property.key.name === name) {
-                return property.value.value
-            }
-        }
+    for (const property of classProperties) {
+      if (property.key.name === name) {
+        return property.value.value
+      }
     }
-    return null
+  }
+  return null
 }
 
 function evaluateIdentifier(context: Context, name: string, node: es.Node) {
@@ -273,7 +273,7 @@ function evaluateIdentifier(context: Context, name: string, node: es.Node) {
         if (environment.head[name]['TYPE'] == 'Function') {
           return environment.head[name]
         } else if (environment.head[name]['TYPE'] == 'Class') {
-            return environment.head[name]
+          return environment.head[name]
         } else {
           return environment.head[name]['value']
         }
