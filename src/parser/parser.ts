@@ -796,7 +796,6 @@ class ClassBodyGenerator implements CalcVisitor<es.ClassBody> {
     )
   }
 }
-
 class ClassStatGenerator implements CalcVisitor<es.Statement> {
   visitStorPropDeclStat(ctx: StorPropDeclStatContext): es.PropertyDefinition {
     const generator = new ExpressionGenerator()
@@ -932,6 +931,7 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
     )
   }
 }
+
 class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
   visitProtocolBody(ctx: ProtocolBodyContext): es.ProtocolBody {
     const ESTreeProtocolBody: es.ProtocolBody = {
@@ -940,9 +940,9 @@ class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
       type: 'ProtocolBody'
     }
 
-    const generator = new PropertyRequirementGenerator()
-    for (let i = 0; i < ctx.property_requirement().length; i++) {
-      ESTreeProtocolBody.body.push(ctx.property_requirement(i).accept(generator))
+    const generator = new PropertyStatGenerator()
+    for (let i = 0; i < ctx.protocol_stat().length; i++) {
+      ESTreeProtocolBody.body.push(<es.Requirement> ctx.protocol_stat(i).accept(generator))
     }
 
     return ESTreeProtocolBody
@@ -976,8 +976,7 @@ class ProtocolBodyGenerator implements CalcVisitor<es.ProtocolBody> {
     )
   }
 }
-
-class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement> {
+class PropertyStatGenerator implements CalcVisitor<es.Statement> {
   visitPropertyRequirement(ctx: PropertyRequirementContext): es.PropertyRequirement {
     const ESTreePropertyRequirement: es.PropertyRequirement = {
       type: 'PropertyRequirement',
@@ -1002,19 +1001,19 @@ class PropertyRequirementGenerator implements CalcVisitor<es.PropertyRequirement
     return ESTreePropertyRequirement
   }
 
-  visit(tree: ParseTree): es.PropertyRequirement {
+  visit(tree: ParseTree): es.Statement {
     return tree.accept(this)
   }
 
-  visitChildren(node: RuleNode): es.PropertyRequirement {
+  visitChildren(node: RuleNode): es.Statement {
     return node.accept(this)
   }
 
-  visitTerminal(node: TerminalNode): es.PropertyRequirement {
+  visitTerminal(node: TerminalNode): es.Statement {
     return node.accept(this)
   }
 
-  visitErrorNode(node: ErrorNode): es.PropertyRequirement {
+  visitErrorNode(node: ErrorNode): es.Statement {
     throw new FatalSyntaxError(
       {
         start: {

@@ -243,12 +243,12 @@ export async function runInContext(
   //Debug
   console.log('Begin validation...')
 
-  validateAndAnnotate(program as Program, context)
+  // validateAndAnnotate(program as Program, context)
 
   //Debug
   console.log('Begin typeChecking...')
 
-  typeCheck(program, context)
+  // typeCheck(program, context)
 
   if (context.errors.length > 0) {
     return resolvedErrorPromise
