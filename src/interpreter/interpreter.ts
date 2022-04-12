@@ -201,8 +201,23 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
   //Debug
   console.log('[assignVariables] name: ' + name)
   let environment = currentEnvironment(context)
+  let classNode = null
   while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
+      //Check if the variable is a property of the current class
+      if(currentClass != null && environment.tail.head.hasOwnProperty(currentClass)){
+          classNode = environment.tail.head[currentClass]
+      }
     environment = environment.tail
+  }
+
+  //If the variable was found in the current class, go into that class and assign the variable
+  if(classNode != null && currentClass != null) {
+      for(let i = 0; i < classNode.value.value.body.length; i++){
+          if(classNode.value.value.body[i].key.name == name){
+              classNode.value.value.body[i].value.value = value
+              return environment
+          }
+      }
   }
 
   if (environment.head.hasOwnProperty(name)) {
@@ -235,6 +250,7 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 }
 
 function findClassProperty(context: Context, name: string, node: es.Node) {
+    console.log('[findClassProperty] name: ' + name + " currentClass: " + currentClass)
   let currentClassNode
 
   if (currentClass != null) {
@@ -405,8 +421,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     Identifier: function*(node: es.Identifier, context: Context) {
         //Debug
-        console.log('[Identifier]')
         const name = node.name
+        console.log('[Identifier] name:', name)
 
         if(currentEnvironment(context).head.hasOwnProperty(name)){
             return yield* evaluate(currentEnvironment(context).head[name], context)
@@ -580,8 +596,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         //Debug
         console.log("[MemberExpression]")
         const object = yield* evaluate(node.object, context);
+        const object_name = (<es.Identifier>node.object).name;
         const oldClass = currentClass
-        currentClass = (<es.Identifier>node.object).name
+        currentClass = object_name
         const properties = object.value.body
         const property_name = (<es.Identifier>node.property).name
         let property = null
@@ -630,11 +647,21 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         const name = (<es.Identifier>node.left).name
         const value = yield* evaluate(node.right, context)
 
-        //Debug
-        // console.log(value)
-        
-        assignVariables(context, name, value, node)
+        if (node.left.type == "MemberExpression") {
+            const property_name = (<es.Identifier>node.left.property).name
+            const object_name = (<es.Identifier>node.left.object).name
+            const objectNode = evaluateIdentifier(context, object_name, node)
+            const object_body = objectNode.value.body
 
+            for (let i = 0; i < object_body.length; i++) {
+                if (object_body[i].key.name == property_name) {
+                    objectNode.value.body[i].value.value = value
+                }
+            }
+            assignVariables(context, object_name, objectNode, node)
+        } else {
+            assignVariables(context, name, value, node)
+        }
         return null;
     },
 
