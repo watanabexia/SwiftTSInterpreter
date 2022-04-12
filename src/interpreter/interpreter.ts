@@ -203,21 +203,21 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
   let environment = currentEnvironment(context)
   let classNode = null
   while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
-      //Check if the variable is a property of the current class
-      if(currentClass != null && environment.tail.head.hasOwnProperty(currentClass)){
-          classNode = environment.tail.head[currentClass]
-      }
+    //Check if the variable is a property of the current class
+    if (currentClass != null && environment.tail.head.hasOwnProperty(currentClass)) {
+      classNode = environment.tail.head[currentClass]
+    }
     environment = environment.tail
   }
 
   //If the variable was found in the current class, go into that class and assign the variable
-  if(classNode != null && currentClass != null) {
-      for(let i = 0; i < classNode.value.value.body.length; i++){
-          if(classNode.value.value.body[i].key.name == name){
-              classNode.value.value.body[i].value.value = value
-              return environment
-          }
+  if (classNode != null && currentClass != null) {
+    for (let i = 0; i < classNode.value.value.body.length; i++) {
+      if (classNode.value.value.body[i].key.name == name) {
+        classNode.value.value.body[i].value.value = value
+        return environment
       }
+    }
   }
 
   if (environment.head.hasOwnProperty(name)) {
@@ -250,7 +250,7 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 }
 
 function findClassProperty(context: Context, name: string, node: es.Node) {
-    console.log('[findClassProperty] name: ' + name + " currentClass: " + currentClass)
+  console.log('[findClassProperty] name: ' + name + ' currentClass: ' + currentClass)
   let currentClassNode
 
   if (currentClass != null) {
