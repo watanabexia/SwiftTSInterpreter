@@ -260,7 +260,7 @@ function findClassProperty(context: Context, name: string, node: es.Node) {
 
     for (const property of classProperties) {
       if (property.key.name === name) {
-        return property.value.value
+        return property
       }
     }
   }
@@ -429,7 +429,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         }
 
         if(currentClass != null && findClassProperty(context, name, node) != null){
-            return findClassProperty(context, name, node)
+            return yield* evaluate(findClassProperty(context, name, node), context)
         }
         return evaluateIdentifier(context, name, node)
 
@@ -444,7 +444,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         if(callee.TYPE === 'Class') {
             return evaluateIdentifier(context, callee_name, node)
         } else {
-            const callee = yield* evaluate(node.callee, context)
             const args = node.arguments
 
             //Debug
@@ -652,12 +651,37 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
             const object_name = (<es.Identifier>node.left.object).name
             const objectNode = evaluateIdentifier(context, object_name, node)
             const object_body = objectNode.value.body
+            let property_to_assign
 
             for (let i = 0; i < object_body.length; i++) {
                 if (object_body[i].key.name == property_name) {
-                    objectNode.value.body[i].value.value = value
+                    property_to_assign = objectNode.value.body[i]
                 }
             }
+
+            if (property_to_assign != null) {
+                if (property_to_assign.type == 'CompPropDeclaration') {
+                    //HANDLE COMPUTED PROPERTY HERE
+                    /*
+                    console.log("[type == 'CompPropDeclaration]", property_to_assign)
+                    console.log("ENV1", currentEnvironment(context))
+                    const env = createFunctionEnvironment('set', ['a'], [value], context)
+                    pushEnvironment(context, env)
+                    console.log("ENV2", currentEnvironment(context))
+
+                    const result = yield* evaluate(property_to_assign, context)
+                    console.log("RESULT", result)
+                    console.log("ENV3", currentEnvironment(context))
+
+                    popEnvironment(context)
+
+                     */
+
+                } else if (property_to_assign.type == 'PropertyDefinition') {
+                    property_to_assign.value.value = value
+                }
+            }
+
             assignVariables(context, object_name, objectNode, node)
         } else {
             assignVariables(context, name, value, node)
