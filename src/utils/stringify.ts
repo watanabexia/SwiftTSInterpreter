@@ -207,9 +207,9 @@ function niceTypeToString(type: Type, nameMap = { _next: 0 }): string {
       const paramStr = []
 
       for (let i = 0; i < paramNameStr.length; i++) {
-        paramStr.push(paramNameStr[i] + ":" + paramTypeStr[i])
+        paramStr.push(paramNameStr[i] + ':' + paramTypeStr[i])
       }
-      
+
       let parametersString = paramStr.join(', ')
 
       if (type.parameterTypes.length !== 1 || type.parameterTypes[0].kind === 'function') {

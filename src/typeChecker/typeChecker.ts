@@ -42,7 +42,7 @@ import {
 const NEGATIVE_OP = '-_1'
 let typeIdCounter = 0
 
-let currentClass = "program"
+let currentClass = 'program'
 
 /**
  * Called before and after type inference. First to add typeVar attribute to node, second to resolve
@@ -903,7 +903,7 @@ function _infer(
       const idType = lookupType(node.name, env) as Type
 
       //Debug
-      console.log("IDentifIER!!!!!!")
+      console.log('IDentifIER!!!!!!')
       console.log(node.name)
       console.log(env)
       console.log(idType)
@@ -1030,7 +1030,8 @@ function _infer(
           PropDTypes.push(requirement.kind)
           Get.push(requirement.get)
           Set.push(requirement.set)
-        } else { // Method Requirement
+        } else {
+          // Method Requirement
           MethodNames.push(requirement.key.name)
           const Types = []
           const ParamNames = []
@@ -1046,7 +1047,15 @@ function _infer(
         }
       }
 
-      const newProtocol = tProtocol(PropNames, PropTypes, PropDTypes, Get, Set, MethodNames, MethodTypes)
+      const newProtocol = tProtocol(
+        PropNames,
+        PropTypes,
+        PropDTypes,
+        Get,
+        Set,
+        MethodNames,
+        MethodTypes
+      )
 
       //Debug
       // console.log("[PROTOCOL DEC TYPE CHECK]")
@@ -1096,7 +1105,7 @@ function _infer(
             addToConstraintList(constraints, [methNode.inferredType as Variable, RTNType])
 
             const m_name = methNode.key.name
-            
+
             const param_names = []
             const m_Types = []
 
@@ -1113,7 +1122,6 @@ function _infer(
 
             const m_Type = tFunc(...m_Types)
             m_Type.parameterNames = param_names
-
 
             methodNames.push(m_name)
             methodTypes.push(m_Type)
@@ -1140,7 +1148,15 @@ function _infer(
         }
       }
 
-      const classType = tClass(name, storPropNames, storPropTypes, compPropNames, compPropTypes, methodNames, methodTypes)
+      const classType = tClass(
+        name,
+        storPropNames,
+        storPropTypes,
+        compPropNames,
+        compPropTypes,
+        methodNames,
+        methodTypes
+      )
 
       env[env.length - 1].typeMap.set(name, classType)
 
@@ -1214,14 +1230,17 @@ function _infer(
           const protoMethodName = protocolType.MethodNames[i]
           const protoMethodType = protocolType.MethodTypes[i]
 
-          let p_index = methodNames.indexOf(protoMethodName)
+          const p_index = methodNames.indexOf(protoMethodName)
           if (p_index !== -1) {
-            
           } else {
             if (protoMethodName === 'init') {
-              typeErrors.push(new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType))
+              typeErrors.push(
+                new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType)
+              )
             } else {
-              typeErrors.push(new MissingMethError(node, name, protocolName, protoMethodName, protoMethodType))
+              typeErrors.push(
+                new MissingMethError(node, name, protocolName, protoMethodName, protoMethodType)
+              )
             }
           }
         }
@@ -1375,7 +1394,8 @@ function _infer(
       let prop_name = undefined
       if (PropNode.type === 'Identifier') {
         prop_name = PropNode.name
-      } else { // CallExpression
+      } else {
+        // CallExpression
         prop_name = (<es.Identifier>(<es.CallExpression>PropNode).callee).name!
       }
 
@@ -1399,7 +1419,6 @@ function _infer(
 
       if (objType !== undefined) {
         if (objType.kind === 'class') {
-
           const className = objType.name
 
           let p_Type: Type = tUndef
@@ -1415,28 +1434,34 @@ function _infer(
               //Check Check Method
               const methodNames = objType.methodNames!
               p_index = methodNames.indexOf(prop_name)
-              if (p_index === -1) { // Error member not found
+              if (p_index === -1) {
+                // Error member not found
                 typeErrors.push(new ParseClassUnfoundError(node, prop_name, className))
                 return addToConstraintList(constraints, [storedType, tUndef])
-              } else { // Method!
+              } else {
+                // Method!
                 const methodTypes = objType.methodTypes
                 p_Type = methodTypes[p_index].returnType
               }
-            } else { // Comp Property!
+            } else {
+              // Comp Property!
               const compPropTypes = objType.compPropTypes
               p_Type = compPropTypes[p_index]
             }
-          } else { // Store Property!
+          } else {
+            // Store Property!
             const storPropTypes = objType.storPropTypes
             p_Type = storPropTypes[p_index]
           }
 
           return addToConstraintList(constraints, [storedType, p_Type])
-        } else { // Object is not class
+        } else {
+          // Object is not class
           typeErrors.push(new ParseClassUnfoundError(node, prop_name, (<Primitive>objType).name))
           return addToConstraintList(constraints, [storedType, tUndef])
         }
-      } else { // Object not found
+      } else {
+        // Object not found
         typeErrors.push(new ParseUnfoundError(node, obj_name))
         return addToConstraintList(constraints, [storedType, tUndef])
       }

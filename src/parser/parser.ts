@@ -427,7 +427,9 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
 
     for (let i = 0; i < ctx.arg_value().length; i++) {
-      (<es.CallExpression>ESTreeMemberExpression.property).arguments.push(ctx.arg_value(i).accept(argu_generator))
+      ;(<es.CallExpression>ESTreeMemberExpression.property).arguments.push(
+        ctx.arg_value(i).accept(argu_generator)
+      )
     }
 
     return ESTreeMemberExpression
@@ -1124,7 +1126,7 @@ class PropertyStatGenerator implements CalcVisitor<es.Statement> {
         type: 'Identifier',
         name: <string>ctx._id.text
       },
-      kind: "method",
+      kind: 'method',
       TYPE: null,
       params: [],
       static: false,
@@ -1150,7 +1152,7 @@ class PropertyStatGenerator implements CalcVisitor<es.Statement> {
         type: 'Identifier',
         name: 'init'
       },
-      kind: "method",
+      kind: 'method',
       TYPE: null,
       params: [],
       static: false,

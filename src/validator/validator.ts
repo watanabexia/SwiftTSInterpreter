@@ -28,7 +28,9 @@ export function validateAndAnnotate(
     // accessedBeforeDeclarationMap.set(node, initialisedIdentifiers)
   }
 
-  function processFunction(node: es.FunctionDeclaration | es.ArrowFunctionExpression | es.MethodDefinition) {
+  function processFunction(
+    node: es.FunctionDeclaration | es.ArrowFunctionExpression | es.MethodDefinition
+  ) {
     DeclarationMap.set(
       node,
       new Map((node.params as es.Identifier[]).map(id => [id.name, new Declaration(true)]))
@@ -160,7 +162,7 @@ export function validateAndAnnotate(
   function validateIdentifier(id: es.Identifier, ancestors: TypeAnnotatedNode<es.Node>[]) {
     const name = id.name
     let Found = false
-       
+
     for (let i = ancestors.length - 1; i >= 0; i--) {
       const a = ancestors[i]
       const map = DeclarationMap.get(a)
@@ -175,7 +177,6 @@ export function validateAndAnnotate(
     }
 
     if (!Found) {
-
       //Debug
       // console.log('[Unfound Identifier]')
       // console.log(name)
@@ -297,7 +298,7 @@ export function validateAndAnnotate(
         // console.log('[Update Identifier]')
         // console.log(name)
         // for (let i = ancestors.length - 1; i >= 0; i--) {
-          // console.log(ancestors[i].type, DeclarationMap.get(ancestors[i]))
+        // console.log(ancestors[i].type, DeclarationMap.get(ancestors[i]))
         // }
 
         // const accessedBeforeDeclaration = accessedBeforeDeclarationMap.get(lastAncestor)!.get(name)!

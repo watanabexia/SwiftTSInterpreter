@@ -172,10 +172,11 @@ export class ParseClassUnfoundError implements SourceError {
   public type = ErrorType.TYPE
   public severity = ErrorSeverity.WARNING
 
-  constructor(public node: TypeAnnotatedNode<es.Node>, 
-              public id: string,
-              public className: string
-             ) {}
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public id: string,
+    public className: string
+  ) {}
 
   get location() {
     return this.node.loc!
@@ -408,9 +409,9 @@ export class MissingInitError implements SourceError {
 
   public explain() {
     return stripIndent`
-    Type '${this.className}' does not conform to protocol '${this.protocol}': requires initializer '${
-      this.methName
-    }' with type '${typeToString(this.methType)}'
+    Type '${this.className}' does not conform to protocol '${
+      this.protocol
+    }': requires initializer '${this.methName}' with type '${typeToString(this.methType)}'
     `
   }
 
@@ -447,4 +448,3 @@ export class MissingMethError implements SourceError {
     return this.explain()
   }
 }
-
