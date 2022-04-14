@@ -72,9 +72,9 @@ declare_types: LET
              | VAR
              ;
 
-built_in: PRINT
-        | INT
-        ;
+//built_in: PRINT
+//        | INT
+//        ;
 
 /*
 Function Arguments
@@ -108,7 +108,7 @@ class_body: '{' body=class_stat* '}'                                           #
 class_stat: declare_type=declare_types id=ID '=' value=expr stat_end?                             # StorPropDeclStat
           | declare_type=declare_types id=ID ':' type=types stat_end?                             # StorPropTypeDeclStat
           | declare_type=declare_types id=ID ':' type=types body=comp_prop_block_stat stat_end?   # CompPropDeclStat
-          | REQUIRED? INIT '(' argument=arg_type* ')' body=block_stat stat_end?                   # InitStat
+          | (required=REQUIRED)? INIT '(' argument=arg_type* ')' body=block_stat stat_end?        # InitStat
           | FUNC id=ID '(' argument=arg_type* ')' ('->' type=types)? body=block_stat stat_end?    # MethodStat
           | NEWLINE                                                                               # ClassEmptStat
           ;
@@ -153,10 +153,10 @@ expr
    | TRUE                                               # True
    | FALSE                                              # False
    | STR                                                # String
-   | object=ID '.' property=expr                        # MemberExpression
+   | object=ID '.' method=ID '('argument=arg_value*')'  # MethodCall
+   | object=ID '.' property=ID                          # MemberExpression
    | int=NUMBER '.' frac=NUMBER                         # Decimal
    | '(' inner=expr ')'                                 # Parentheses
-   | id=built_in '(' argument=expr ')'                  # BIFuncCall
    | id=ID '(' argument=arg_value* ')'                  # FuncCall
    | left=expr operator=MOD right=expr                  # Modulo
    | left=expr operator=MUL right=expr                  # Multiplication
@@ -174,4 +174,5 @@ expr
    | left=expr operator=LOGICALOR right=expr            # LogicalOr
    | operator=LOGICALNOT argument=expr                  # LogicalNot
    | operator=SUB argument=expr                         # Negate
+//   | id=built_in '(' argument=expr ')'                  # BIFuncCall
    ;

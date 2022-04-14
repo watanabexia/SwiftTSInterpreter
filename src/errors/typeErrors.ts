@@ -168,6 +168,30 @@ export class ParseUnfoundError implements SourceError {
   }
 }
 
+export class ParseClassUnfoundError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(public node: TypeAnnotatedNode<es.Node>, 
+              public id: string,
+              public className: string
+             ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Value of type '${this.className}' has no member '${this.id}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
 export class ParseUnexpectedReturnError implements SourceError {
   public type = ErrorType.TYPE
   public severity = ErrorSeverity.WARNING
@@ -365,3 +389,62 @@ export class MissingGetterError implements SourceError {
     return this.explain()
   }
 }
+
+export class MissingInitError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public className: string,
+    public protocol: string,
+    public methName: string,
+    public methType: Type
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Type '${this.className}' does not conform to protocol '${this.protocol}': requires initializer '${
+      this.methName
+    }' with type '${typeToString(this.methType)}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class MissingMethError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public className: string,
+    public protocol: string,
+    public methName: string,
+    public methType: Type
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Type '${this.className}' does not conform to protocol '${this.protocol}': requires function '${
+      this.methName
+    }' with type '${typeToString(this.methType)}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+

@@ -28,12 +28,16 @@ export function validateAndAnnotate(
     // accessedBeforeDeclarationMap.set(node, initialisedIdentifiers)
   }
 
-  function processFunction(node: es.FunctionDeclaration | es.ArrowFunctionExpression) {
+  function processFunction(node: es.FunctionDeclaration | es.ArrowFunctionExpression | es.MethodDefinition) {
     DeclarationMap.set(
       node,
       new Map((node.params as es.Identifier[]).map(id => [id.name, new Declaration(true)]))
     )
-    DeclarationMap.get(node)?.set((<es.FunctionDeclaration>node).id!.name, new Declaration(true))
+    // if (node.type === 'MethodDefinition') {
+    //   DeclarationMap.get(node)?.set((<es.MethodDefinition>node).key!.name, new Declaration(true))
+    // } else {
+    //   DeclarationMap.get(node)?.set((<es.FunctionDeclaration>node).id!.name, new Declaration(true))
+    // }
 
     //Debug
     // console.log("P FUNC VALID")
@@ -50,15 +54,31 @@ export function validateAndAnnotate(
 
   function processClass(node: es.ClassDeclaration) {
     DeclarationMap.set(node, new Map<string, Declaration>())
-    DeclarationMap.get(node)?.set((<es.ClassDeclaration>node).id!.name, new Declaration(true))
+
+    // DeclarationMap.get(node)?.set((<es.ClassDeclaration>node).id!.name, new Declaration(true))
 
     for (let i = 0; i < node.body.body.length; i++) {
       const PNode = node.body.body[i]
-      if (PNode.type === 'PropertyDefinition') {
-        const storPropName = PNode.key.name
-        DeclarationMap.get(node)?.set(storPropName, new Declaration(true))
+      switch (PNode.type) {
+        case 'PropertyDefinition': {
+          const storPropName = PNode.key.name
+          DeclarationMap.get(node)?.set(storPropName, new Declaration(true))
+          break
+        }
+        case 'CompPropDeclaration': {
+          const compPropName = PNode.key.name
+          DeclarationMap.get(node)?.set(compPropName, new Declaration(true))
+          break
+        }
+        case 'MethodDefinition': {
+          const MethodName = PNode.key.name
+          DeclarationMap.get(node)?.set(MethodName, new Declaration(true))
+          break
+        }
       }
     }
+
+    DeclarationMap.get(node)?.set('self', new Declaration(true))
   }
 
   // initialise scope of variables
@@ -91,6 +111,11 @@ export function validateAndAnnotate(
       if (node.body) {
         c(node.body, st, 'BlockStatement')
       }
+    },
+    MethodDefinition(node: es.MethodDefinition, st: never, c: FullWalkerCallback<never>) {
+      if (node.value) {
+        c(node.value, st, 'BlockStatement')
+      }
     }
   }
 
@@ -102,14 +127,40 @@ export function validateAndAnnotate(
       FunctionDeclaration: processFunction,
       ClassDeclaration: processClass,
       ArrowFunctionExpression: processFunction,
+      MethodDefinition: processFunction,
       ForStatement(forStatement: es.ForStatement, ancestors: es.Node[]) {}
     },
     customWalker1
   )
 
+  // function validateIdentifierClass(id: es.Identifier, ancestors: TypeAnnotatedNode<es.Node>[]) {
+  //   const name = id.name
+  //   let Found = false
+  //   let ClassName = ""
+
+  //   for (let i = ancestors.length - 1; i >= 0; i--) {
+  //     const a = ancestors[i]
+  //     if (a.type === 'ClassDeclaration') {
+  //       ClassName = a.id!.name
+  //       const map = DeclarationMap.get(a)
+  //       if (map?.has(name)) {
+  //         Found = true
+  //       }
+  //       break
+  //     }
+  //   }
+
+  //   if (!Found) {
+  //     context.errors.push(new ParseClassUnfoundError(ancestors[ancestors.length - 1], name, ClassName))
+  //   } else {
+  //     // ancestors[ancestors.length - 1].typability = 'NotYetTyped'
+  //   }
+  // }
+
   function validateIdentifier(id: es.Identifier, ancestors: TypeAnnotatedNode<es.Node>[]) {
     const name = id.name
     let Found = false
+       
     for (let i = ancestors.length - 1; i >= 0; i--) {
       const a = ancestors[i]
       const map = DeclarationMap.get(a)
@@ -122,7 +173,16 @@ export function validateAndAnnotate(
       //   break
       // }
     }
+
     if (!Found) {
+
+      //Debug
+      // console.log('[Unfound Identifier]')
+      // console.log(name)
+      // for (let i = ancestors.length - 1; i >= 0; i--) {
+      //   console.log(ancestors[i].type, DeclarationMap.get(ancestors[i]))
+      // }
+
       context.errors.push(new ParseUnfoundError(ancestors[ancestors.length - 1], name))
     } else {
       // ancestors[ancestors.length - 1].typability = 'NotYetTyped'
@@ -206,6 +266,20 @@ export function validateAndAnnotate(
         }
         c(node.body, st, 'BlockStatement')
       }
+    },
+    MethodDefnition(node: es.MethodDefinition, st: never, c: FullWalkerCallback<never>) {
+      if (node.value) {
+        c(node.value, st, 'BlockStatement')
+      }
+    },
+    MemberExpression(node: es.MemberExpression, st: never, c: FullWalkerCallback<never>) {
+      // if (node.object.type === 'Identifier') {
+      //   if (node.object.name === 'self') {}
+      //   else {
+      //     c(node.object, st, node.object.type)
+      //     c(node.property, st, node.property.type)
+      //   }
+      // }
     }
   }
 
@@ -218,6 +292,13 @@ export function validateAndAnnotate(
         const name = getVariableDecarationName(node)
         DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
         // node.typability = 'NotYetTyped'
+
+        //Debug
+        // console.log('[Update Identifier]')
+        // console.log(name)
+        // for (let i = ancestors.length - 1; i >= 0; i--) {
+          // console.log(ancestors[i].type, DeclarationMap.get(ancestors[i]))
+        // }
 
         // const accessedBeforeDeclaration = accessedBeforeDeclarationMap.get(lastAncestor)!.get(name)!
         //   .accessedBeforeDeclaration
@@ -253,6 +334,28 @@ export function validateAndAnnotate(
         const name = node.id!.name
         DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
       },
+      MethodDefinition(node: TypeAnnotatedNode<es.MethodDefinition>, ancestors: es.Node[]) {
+        // a function declaration can be typed if there are no function calls in the same scope before it
+
+        // Update available token
+        const lastAncestor = ancestors[ancestors.length - 2]
+        const name = node.key!.name
+        DeclarationMap.get(lastAncestor)?.set(name, new Declaration(true))
+
+        // Check Return Statement
+        const node_RTN = getReturnStatement(node.value)
+        if (node.TYPE === null) {
+          if (node_RTN !== null) {
+            context.errors.push(new ParseUnexpectedReturnError(node_RTN))
+          }
+        } else {
+          if (node_RTN !== null) {
+          } else {
+            context.errors.push(new ParseMissingReturnError(node, node.TYPE))
+          }
+        }
+        node.typability = scopeHasCallExpressionMap.get(lastAncestor) ? 'Untypable' : 'NotYetTyped'
+      },
       ProtocolDeclaration(node: TypeAnnotatedNode<es.ProtocolDeclaration>, ancestors: es.Node[]) {
         // Update available token
         const lastAncestor = ancestors[ancestors.length - 2]
@@ -275,10 +378,26 @@ export function validateAndAnnotate(
         // console.log('VALIDATE CALL[2]')
 
         // call.typability = 'NotYetTyped'
+      },
+      MemberExpression(node: TypeAnnotatedNode<es.MemberExpression>, ancestors: es.Node[]) {
+        // if (node.object.type === 'Identifier') {
+        //   if (node.object.name === 'self') {
+        //     validateIdentifierClass(node.object, ancestors)
+        //     if (node.property.type === 'Identifier') {
+        //       validateIdentifierClass(node.property, ancestors)
+        //     } else if (node.property.type === 'CallExpression') {
+        //       validateIdentifierClass(<es.Identifier>node.property.callee, ancestors)
+        //     }
+        //   }
+        // }
       }
     },
     customWalker
   )
+
+  //Debug
+  // console.log("FINAL declaration Map")
+  // console.log(DeclarationMap)
 
   return program
 }

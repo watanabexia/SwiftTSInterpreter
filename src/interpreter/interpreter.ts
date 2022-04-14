@@ -425,14 +425,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         console.log("[CallExpression]")
         const callee_name = (<es.Identifier>node.callee).name
         const callee = evaluateIdentifier(context, callee_name, node)
+        
         if(callee.TYPE === 'Class') {
             return evaluateIdentifier(context, callee_name, node)
         } else {
-            const callee = yield* evaluate(node.callee, context)
             const args = node.arguments
-
-            //Debug
-            // console.log(callee)
 
             const arg_variables = []
             for (let i = 0; i < args.length; i++) {
@@ -619,8 +616,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     PropertyDefinition: function*(node: es.PropertyDefinition, context: Context) {
         console.log("[PropertyDefinition]")
-        const result = yield* evaluate(node.value, context);
-        return result
+        if (node.value) {
+          const result = yield* evaluate(node.value, context);
+          return result
+        } else { //TODO: Property Type Definition
+          return null
+        }
     },
 
     AssignmentExpression: function*(node: es.AssignmentExpression, context: Context) {

@@ -202,11 +202,24 @@ function niceTypeToString(type: Type, nameMap = { _next: 0 }): string {
         return `List<${headType}>`
       return `[${curriedTypeToString(type.headType)}, ${curriedTypeToString(type.tailType)}]`
     case 'function':
-      let parametersString = type.parameterTypes.map(curriedTypeToString).join(', ')
+      const paramNameStr = type.parameterNames!
+      const paramTypeStr = type.parameterTypes.map(curriedTypeToString)
+      const paramStr = []
+
+      for (let i = 0; i < paramNameStr.length; i++) {
+        paramStr.push(paramNameStr[i] + ":" + paramTypeStr[i])
+      }
+      
+      let parametersString = paramStr.join(', ')
+
       if (type.parameterTypes.length !== 1 || type.parameterTypes[0].kind === 'function') {
         parametersString = `(${parametersString})`
       }
-      return `${parametersString} -> ${curriedTypeToString(type.returnType)}`
+      if (type.returnType.kind === 'primitive' && type.returnType.name === 'Undefined') {
+        return `${parametersString}`
+      } else {
+        return `${parametersString} -> ${curriedTypeToString(type.returnType)}`
+      }
     case 'class':
       return type.name
     default:
