@@ -273,8 +273,8 @@ export interface ClassType {
   storPropTypes: Type[]
   compPropNames?: string[]
   compPropTypes: Type[]
-  // methodNames?: string[]
-  // methodTypes: FunctionType[]
+  methodNames?: string[]
+  methodTypes: FunctionType[]
 }
 
 export interface Protocol {
@@ -284,6 +284,8 @@ export interface Protocol {
   PropDTypes: string[]
   Get: boolean[]
   Set: boolean[]
+  MethodNames: string[]
+  MethodTypes: FunctionType[]
   // mutating: boolean[]
 }
 

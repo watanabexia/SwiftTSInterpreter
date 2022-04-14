@@ -57,7 +57,14 @@ import {
   ProtocolBodyContext,
   PropertyRequirementContext,
   CompPropEmptStatContext,
-  ClassEmptStatContext
+  ClassEmptStatContext,
+  MethodRequirementContext,
+  InitRequirementContext,
+  EmptyRequirementContext,
+  StorPropTypeDeclStatContext,
+  MethodStatContext,
+  InitStatContext,
+  MethodCallContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
@@ -381,14 +388,50 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx),
       object: {
         type: 'Identifier',
+        loc: contextToLocation(ctx),
         name: <string>ctx._object.text
       },
       property: {
         type: 'Identifier',
+        loc: contextToLocation(ctx),
         name: <string>ctx._property.text
       },
       optional: false
     }
+    return ESTreeMemberExpression
+  }
+
+  visitMethodCall(ctx: MethodCallContext): es.MemberExpression {
+    const argu_generator = new IdentifierGenerator()
+    const ESTreeMemberExpression: es.MemberExpression = {
+      type: 'MemberExpression',
+      computed: false,
+      loc: contextToLocation(ctx),
+      object: {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: <string>ctx._object.text
+      },
+      property: {
+        type: 'CallExpression',
+        loc: contextToLocation(ctx),
+        callee: {
+          type: 'Identifier',
+          loc: contextToLocation(ctx),
+          name: ctx._method.text!
+        },
+        arguments: [],
+        optional: false
+      },
+      optional: false
+    }
+
+    for (let i = 0; i < ctx.arg_value().length; i++) {
+      ;(<es.CallExpression>ESTreeMemberExpression.property).arguments.push(
+        ctx.arg_value(i).accept(argu_generator)
+      )
+    }
+
     return ESTreeMemberExpression
   }
 
@@ -412,10 +455,6 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
 
     return ESTreeCallExpression
   }
-
-  // visitBIFuncCall(ctx: BIFuncCallContext): es.CallExpression {
-
-  // }
 
   visitExpression?: ((ctx: ExprContext) => es.Expression) | undefined
   visitStart?: ((ctx: StatContext) => es.Expression) | undefined
@@ -817,6 +856,22 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
     return ESTreePropertyDefinition
   }
 
+  visitStorPropTypeDeclStat(ctx: StorPropTypeDeclStatContext): es.PropertyDefinition {
+    const ESTreePropertyDefinition: es.PropertyDefinition = {
+      type: 'PropertyDefinition',
+      static: false,
+      computed: false,
+      key: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      value: undefined,
+      TYPE: ctx._type.text,
+      kind: <'let' | 'var'>ctx._declare_type.text
+    }
+    return ESTreePropertyDefinition
+  }
+
   visitCompPropDeclStat(ctx: CompPropDeclStatContext): es.CompPropDeclaration {
     const ESTreeCompPropDeclaration: es.CompPropDeclaration = {
       type: 'CompPropDeclaration',
@@ -847,6 +902,68 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
     }
 
     return ESTreeBlockStatement
+  }
+
+  visitMethodStat(ctx: MethodStatContext): es.MethodDefinition {
+    const generator = new BlockStatementGenerator()
+    const IdGenerator = new IdentifierGenerator()
+    const ESTreeMethodDefinition: es.MethodDefinition = {
+      type: 'MethodDefinition',
+      loc: contextToLocation(ctx),
+      key: {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: ctx._id.text!
+      },
+      TYPE: null,
+      value: ctx._body.accept(generator),
+      params: [],
+      kind: 'method',
+      computed: false,
+      static: false,
+      required: false
+    }
+
+    if (ctx._type) {
+      ESTreeMethodDefinition.TYPE = ctx._type.text
+    }
+
+    for (let i = 0; i < ctx.arg_type().length; i++) {
+      ESTreeMethodDefinition.params.push(ctx.arg_type(i).accept(IdGenerator))
+    }
+
+    return ESTreeMethodDefinition
+  }
+
+  visitInitStat(ctx: InitStatContext): es.MethodDefinition {
+    const generator = new BlockStatementGenerator()
+    const IdGenerator = new IdentifierGenerator()
+    const ESTreeMethodDefinition: es.MethodDefinition = {
+      type: 'MethodDefinition',
+      loc: contextToLocation(ctx),
+      key: {
+        type: 'Identifier',
+        loc: contextToLocation(ctx),
+        name: 'init'
+      },
+      TYPE: null,
+      value: ctx._body.accept(generator),
+      params: [],
+      kind: 'constructor',
+      computed: false,
+      static: false,
+      required: false
+    }
+
+    if (ctx._required) {
+      ESTreeMethodDefinition.required = true
+    }
+
+    for (let i = 0; i < ctx.arg_type().length; i++) {
+      ESTreeMethodDefinition.params.push(ctx.arg_type(i).accept(IdGenerator))
+    }
+
+    return ESTreeMethodDefinition
   }
 
   visitClassEmptStat(ctx: ClassEmptStatContext): es.EmptyStatement {
@@ -999,6 +1116,60 @@ class PropertyStatGenerator implements CalcVisitor<es.Statement> {
     }
 
     return ESTreePropertyRequirement
+  }
+
+  visitMethodRequirement(ctx: MethodRequirementContext): es.MethodRequirement {
+    const IdGenerator = new IdentifierGenerator()
+    const ESTreeMethodRequirement: es.MethodRequirement = {
+      type: 'MethodRequirement',
+      key: {
+        type: 'Identifier',
+        name: <string>ctx._id.text
+      },
+      kind: 'method',
+      TYPE: null,
+      params: [],
+      static: false,
+      computed: false
+    }
+
+    if (ctx._type) {
+      ESTreeMethodRequirement.TYPE = ctx._type.text
+    }
+
+    for (let i = 0; i < ctx.arg_type().length; i++) {
+      ESTreeMethodRequirement.params.push(ctx.arg_type(i).accept(IdGenerator))
+    }
+
+    return ESTreeMethodRequirement
+  }
+
+  visitInitRequirement(ctx: InitRequirementContext): es.MethodRequirement {
+    const IdGenerator = new IdentifierGenerator()
+    const ESTreeMethodRequirement: es.MethodRequirement = {
+      type: 'MethodRequirement',
+      key: {
+        type: 'Identifier',
+        name: 'init'
+      },
+      kind: 'method',
+      TYPE: null,
+      params: [],
+      static: false,
+      computed: false
+    }
+
+    for (let i = 0; i < ctx.arg_type().length; i++) {
+      ESTreeMethodRequirement.params.push(ctx.arg_type(i).accept(IdGenerator))
+    }
+
+    return ESTreeMethodRequirement
+  }
+
+  visitEmptyRequirement(ctx: EmptyRequirementContext): es.Statement {
+    return {
+      type: 'EmptyStatement'
+    }
   }
 
   visit(tree: ParseTree): es.Statement {
