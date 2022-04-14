@@ -1253,16 +1253,17 @@ function _infer(
               }
 
               for (let j = 0; j < protoParamNames.length; j++) {
-                if (protoParamNames[j] !== foundParamNames[j]
-                  || protoParamTypes[j] != foundParamTypes[j]) {
-                    typeErrors.push(
-                      new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType)
-                    )
-                    break
-                  }
+                if (
+                  protoParamNames[j] !== foundParamNames[j] ||
+                  protoParamTypes[j] != foundParamTypes[j]
+                ) {
+                  typeErrors.push(
+                    new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType)
+                  )
+                  break
+                }
               }
             }
-
           } else {
             if (protoMethodName === 'init') {
               typeErrors.push(

@@ -13,7 +13,7 @@ import {
 import * as rttc from '../utils/rttc'
 import Closure from './closure'
 
-let currentClass: string | null = null
+const currentClass: string | null = null
 
 class BreakValue {}
 
@@ -213,18 +213,20 @@ function assignClassVariables(context: Context, name: string, value: any, node: 
   //Debug
   console.log('[assignClassVariables] name: ' + name)
   //Search only in the class env
-  let environment = currentEnvironment(context).tail!
+  const environment = currentEnvironment(context).tail!
 
   if (environment.head.hasOwnProperty(name)) {
-    if (typeof environment.head[name] !== 'symbol') { // Already have value
-      let v_type = get_type(value)                // Receiving Type
+    if (typeof environment.head[name] !== 'symbol') {
+      // Already have value
+      let v_type = get_type(value) // Receiving Type
       let i_type = environment.head[name]['TYPE'] // Stored Type
 
       //Use ClassName as type
       if (i_type === 'Class') {
         i_type = environment.head[name].className
       }
-      if (v_type === 'Object') { // assume to be Class
+      if (v_type === 'Object') {
+        // assume to be Class
         v_type = value.className
       }
 
@@ -243,7 +245,8 @@ function assignClassVariables(context: Context, name: string, value: any, node: 
 
       const i_mutable = environment.head[name]['mutable']
 
-      if (environment.head[name].type === 'Literal') { // Literal variable, sometimes Type declared but no value yet
+      if (environment.head[name].type === 'Literal') {
+        // Literal variable, sometimes Type declared but no value yet
         const i_value = environment.head[name]['value']
         if (i_mutable === false && i_value !== undefined) {
           return handleRuntimeError(context, new errors.ConstAssignment(node, name))
@@ -255,7 +258,8 @@ function assignClassVariables(context: Context, name: string, value: any, node: 
       }
 
       environment.head[name]['value'] = value
-    } else { // First-time initialization (DECLARED_BUT_NOT_ASSIGNED)
+    } else {
+      // First-time initialization (DECLARED_BUT_NOT_ASSIGNED)
       environment.head[name] = value
     }
   } else {
@@ -291,15 +295,17 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
   }
 
   if (environment.head.hasOwnProperty(name)) {
-    if (typeof environment.head[name] !== 'symbol') { // Already have value
-      let v_type = get_type(value)                // Receiving Type
+    if (typeof environment.head[name] !== 'symbol') {
+      // Already have value
+      let v_type = get_type(value) // Receiving Type
       let i_type = environment.head[name]['TYPE'] // Stored Type
 
       //Use ClassName as type
       if (i_type === 'Class') {
         i_type = environment.head[name].className
       }
-      if (v_type === 'Object') { // assume to be Class
+      if (v_type === 'Object') {
+        // assume to be Class
         v_type = value.className
       }
 
@@ -312,7 +318,8 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 
       const i_mutable = environment.head[name]['mutable']
 
-      if (environment.head[name].type === 'Literal') { // Literal variable, sometimes Type declared but no value yet
+      if (environment.head[name].type === 'Literal') {
+        // Literal variable, sometimes Type declared but no value yet
         const i_value = environment.head[name]['value']
         if (i_mutable === false && i_value !== undefined) {
           return handleRuntimeError(context, new errors.ConstAssignment(node, name))
@@ -324,7 +331,8 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
       }
 
       environment.head[name]['value'] = value
-    } else { // First-time initialization (DECLARED_BUT_NOT_ASSIGNED)
+    } else {
+      // First-time initialization (DECLARED_BUT_NOT_ASSIGNED)
       environment.head[name] = value
     }
   } else {
@@ -354,7 +362,7 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 
 function evaluateClassIdentifier(context: Context, name: string, node: es.Node) {
   /* Will return primitive value for primitives, return a structure for functions and classes */
-  
+
   // Search only within the class env
   let environment = currentEnvironment(context)
   while (environment.tail !== null && !environment.head.hasOwnProperty('self')) {
@@ -365,12 +373,12 @@ function evaluateClassIdentifier(context: Context, name: string, node: es.Node) 
     if (typeof environment.head[name] === 'symbol') {
       return handleRuntimeError(context, new errors.UnassignedVariable(name, node))
     } else {
-
       if (environment.head[name]['TYPE'] == 'Function') {
         return environment.head[name]
       } else if (environment.head[name]['TYPE'] == 'Class') {
         return environment.head[name]
-      } else { // TYPE == Int/Bool/... Primitive Values
+      } else {
+        // TYPE == Int/Bool/... Primitive Values
 
         if (environment.head[name]['value'] === undefined) {
           return handleRuntimeError(
@@ -404,12 +412,12 @@ function evaluateIdentifier(context: Context, name: string, node: es.Node) {
     if (typeof environment.head[name] === 'symbol') {
       return handleRuntimeError(context, new errors.UnassignedVariable(name, node))
     } else {
-
       if (environment.head[name]['TYPE'] == 'Function') {
         return environment.head[name]
       } else if (environment.head[name]['TYPE'] == 'Class') {
         return environment.head[name]
-      } else { // TYPE == Int/Bool/... Primitive Values
+      } else {
+        // TYPE == Int/Bool/... Primitive Values
 
         if (environment.head[name]['value'] === undefined) {
           return handleRuntimeError(
@@ -570,7 +578,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         
         if(callee.TYPE === 'Class') {
             //Deep copy the original class obejct
-            let newClassObject = Object.assign({}, callee);
+            const newClassObject = Object.assign({}, callee);
 
             //Debug
             // console.log(callee)
@@ -788,7 +796,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     MemberExpression: function*(node: es.MemberExpression, context: Context) {
         //Debug
         console.log("[MemberExpression]")
-        let object_name = (<es.Identifier>node.object).name;
+        const object_name = (<es.Identifier>node.object).name;
         let object = undefined
         if (object_name === 'self') { // self call
           if (node.property.type === 'Identifier') {
@@ -1216,7 +1224,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
                 type = get_type(value)
               }
 
-              let sub_real_value = {
+              const sub_real_value = {
                 "type": "Literal",
                 "mutable": mutable,
                 "TYPE": type,
@@ -1227,9 +1235,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
             }
             case "CompPropDeclaration": {
               const mutable = false
-              let type = Prop.TYPE
+              const type = Prop.TYPE
 
-              let sub_real_value = {
+              const sub_real_value = {
                 "type": "CompProp",
                 "mutable": mutable,
                 "TYPE": type,
