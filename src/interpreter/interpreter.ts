@@ -201,8 +201,23 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
   //Debug
   console.log('[assignVariables] name: ' + name)
   let environment = currentEnvironment(context)
+  let classNode = null
   while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
+    //Check if the variable is a property of the current class
+    if (currentClass != null && environment.tail.head.hasOwnProperty(currentClass)) {
+      classNode = environment.tail.head[currentClass]
+    }
     environment = environment.tail
+  }
+
+  //If the variable was found in the current class, go into that class and assign the variable
+  if (classNode != null && currentClass != null) {
+    for (let i = 0; i < classNode.value.value.body.length; i++) {
+      if (classNode.value.value.body[i].key.name == name) {
+        classNode.value.value.body[i].value.value = value
+        return environment
+      }
+    }
   }
 
   if (environment.head.hasOwnProperty(name)) {
@@ -235,6 +250,7 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
 }
 
 function findClassProperty(context: Context, name: string, node: es.Node) {
+  console.log('[findClassProperty] name: ' + name + ' currentClass: ' + currentClass)
   let currentClassNode
 
   if (currentClass != null) {
@@ -244,7 +260,7 @@ function findClassProperty(context: Context, name: string, node: es.Node) {
 
     for (const property of classProperties) {
       if (property.key.name === name) {
-        return property.value.value
+        return property
       }
     }
   }
@@ -405,15 +421,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     Identifier: function*(node: es.Identifier, context: Context) {
         //Debug
-        console.log('[Identifier]')
         const name = node.name
+        console.log('[Identifier] name:', name)
 
         if(currentEnvironment(context).head.hasOwnProperty(name)){
             return yield* evaluate(currentEnvironment(context).head[name], context)
         }
 
         if(currentClass != null && findClassProperty(context, name, node) != null){
-            return findClassProperty(context, name, node)
+            return yield* evaluate(findClassProperty(context, name, node), context)
         }
         return evaluateIdentifier(context, name, node)
 
@@ -577,8 +593,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         //Debug
         console.log("[MemberExpression]")
         const object = yield* evaluate(node.object, context);
+        const object_name = (<es.Identifier>node.object).name;
         const oldClass = currentClass
-        currentClass = (<es.Identifier>node.object).name
+        currentClass = object_name
         const properties = object.value.body
         const property_name = (<es.Identifier>node.property).name
         let property = null
@@ -631,11 +648,46 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         const name = (<es.Identifier>node.left).name
         const value = yield* evaluate(node.right, context)
 
-        //Debug
-        // console.log(value)
-        
-        assignVariables(context, name, value, node)
+        if (node.left.type == "MemberExpression") {
+            const property_name = (<es.Identifier>node.left.property).name
+            const object_name = (<es.Identifier>node.left.object).name
+            const objectNode = evaluateIdentifier(context, object_name, node)
+            const object_body = objectNode.value.body
+            let property_to_assign
 
+            for (let i = 0; i < object_body.length; i++) {
+                if (object_body[i].key.name == property_name) {
+                    property_to_assign = objectNode.value.body[i]
+                }
+            }
+
+            if (property_to_assign != null) {
+                if (property_to_assign.type == 'CompPropDeclaration') {
+                    //HANDLE COMPUTED PROPERTY HERE
+                    /*
+                    console.log("[type == 'CompPropDeclaration]", property_to_assign)
+                    console.log("ENV1", currentEnvironment(context))
+                    const env = createFunctionEnvironment('set', ['a'], [value], context)
+                    pushEnvironment(context, env)
+                    console.log("ENV2", currentEnvironment(context))
+
+                    const result = yield* evaluate(property_to_assign, context)
+                    console.log("RESULT", result)
+                    console.log("ENV3", currentEnvironment(context))
+
+                    popEnvironment(context)
+
+                     */
+
+                } else if (property_to_assign.type == 'PropertyDefinition') {
+                    property_to_assign.value.value = value
+                }
+            }
+
+            assignVariables(context, object_name, objectNode, node)
+        } else {
+            assignVariables(context, name, value, node)
+        }
         return null;
     },
 
