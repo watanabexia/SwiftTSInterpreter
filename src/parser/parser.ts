@@ -851,6 +851,7 @@ class ClassStatGenerator implements CalcVisitor<es.Statement> {
         name: <string>ctx._id.text
       },
       value: ctx._value.accept(generator),
+      TYPE: undefined,
       kind: <'let' | 'var'>ctx._declare_type.text
     }
     return ESTreePropertyDefinition

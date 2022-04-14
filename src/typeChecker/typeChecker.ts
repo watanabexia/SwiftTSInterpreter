@@ -227,7 +227,7 @@ export function typeCheck(
   }
 
   //Debug
-  console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
+  // console.log('FINAL Constraints >>>>>>>>>>>>>>>>>>')
   // console.log(constraints)
   // console.log(program)
 
@@ -739,8 +739,8 @@ function infer(
     // console.log(env)
     // console.log("Constraint List >>>")
     // console.log(constraints)
-    console.log('Infer Type >>>')
-    console.log(node)
+    // console.log('Infer Type >>>')
+    // console.log(node)
 
     return _infer(node, env, constraints, isTopLevelAndLastValStmt)
   } catch (e) {
@@ -903,10 +903,10 @@ function _infer(
       const idType = lookupType(node.name, env) as Type
 
       //Debug
-      console.log('IDentifIER!!!!!!')
-      console.log(node.name)
-      console.log(env)
-      console.log(idType)
+      // console.log('IDentifIER!!!!!!')
+      // console.log(node.name)
+      // console.log(env)
+      // console.log(idType)
 
       return addToConstraintList(constraints, [storedType, idType])
 
@@ -968,7 +968,7 @@ function _infer(
     }
     case 'FunctionDeclaration': {
       //Debug
-      console.log('[TYPE CHECK FUNC DECLARE]')
+      // console.log('[TYPE CHECK FUNC DECLARE]')
 
       const f_nameNode = node.id as es.Identifier
       const f_name = f_nameNode.name
@@ -1232,6 +1232,37 @@ function _infer(
 
           const p_index = methodNames.indexOf(protoMethodName)
           if (p_index !== -1) {
+            const foundMethodTypes = methodTypes[p_index]
+
+            const protoParamNames = protoMethodType.parameterNames!
+            const foundParamNames = protoMethodType.parameterNames!
+            if (protoParamNames.length !== foundParamNames.length) {
+              typeErrors.push(
+                new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType)
+              )
+            } else {
+              const protoParamTypes = protoMethodType.parameterTypes
+              const protoRTNType = protoMethodType.returnType
+              const foundParamTypes = foundMethodTypes.parameterTypes
+              const foundRTNType = foundMethodTypes.returnType
+
+              if (protoRTNType != foundRTNType) {
+                typeErrors.push(
+                  new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType)
+                )
+              }
+
+              for (let j = 0; j < protoParamNames.length; j++) {
+                if (protoParamNames[j] !== foundParamNames[j]
+                  || protoParamTypes[j] != foundParamTypes[j]) {
+                    typeErrors.push(
+                      new MissingInitError(node, name, protocolName, protoMethodName, protoMethodType)
+                    )
+                    break
+                  }
+              }
+            }
+
           } else {
             if (protoMethodName === 'init') {
               typeErrors.push(
@@ -1385,7 +1416,7 @@ function _infer(
       throw Error('Array expressions not supported for x-slang')
     case 'MemberExpression': {
       //Debug
-      console.log('INFER[MemberExpression]')
+      // console.log('INFER[MemberExpression]')
 
       const ObjNode = node.object as es.Identifier
       let obj_name = ObjNode.name as string
@@ -1415,7 +1446,7 @@ function _infer(
       const objType = lookupType(obj_name, env) as Type
 
       //Debug
-      console.log(objType)
+      // console.log(objType)
 
       if (objType !== undefined) {
         if (objType.kind === 'class') {

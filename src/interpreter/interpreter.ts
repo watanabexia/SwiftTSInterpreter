@@ -78,6 +78,24 @@ const createEnvironment = (
   return environment
 }
 
+const createClassEnvironment = (
+  functionName: string,
+  arg_ids: Value[],
+  args: Value[],
+  context: Context
+): Environment => {
+  const environment: Environment = {
+    name: functionName,
+    tail: currentEnvironment(context),
+    head: {}
+  }
+
+  for (let i = 0; i < arg_ids.length; i++) {
+    environment.head[arg_ids[i]] = args[i]
+  }
+  return environment
+}
+
 const createFunctionEnvironment = (
   functionName: string,
   arg_ids: Value[],
@@ -175,7 +193,7 @@ function declareVariables(context: Context, node: es.VariableDeclaration) {
 
 function declareFunctionsAndVariables(context: Context, node: es.BlockStatement) {
   //Debug
-  console.log('[declareFunctionsAndVariables]')
+  console.log('FUNC[declareFunctionsAndVariables]')
   for (const statement of node.body) {
     switch (statement.type) {
       case 'VariableDeclaration':
@@ -187,43 +205,35 @@ function declareFunctionsAndVariables(context: Context, node: es.BlockStatement)
       case 'ClassDeclaration':
         declareIdentifier(context, (statement.id as es.Identifier).name, statement)
         break
-      case 'ProtocolDeclaration':
-        declareIdentifier(context, (statement.id as es.Identifier).name, statement)
-        break
-      case 'CompPropDeclaration':
-        declareIdentifier(context, (statement.key as es.Identifier).name, statement)
-        break
     }
   }
 }
 
-function assignVariables(context: Context, name: string, value: any, node: es.Node) {
+function assignClassVariables(context: Context, name: string, value: any, node: es.Node) {
   //Debug
-  console.log('[assignVariables] name: ' + name)
-  let environment = currentEnvironment(context)
-  let classNode = null
-  while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
-    //Check if the variable is a property of the current class
-    if (currentClass != null && environment.tail.head.hasOwnProperty(currentClass)) {
-      classNode = environment.tail.head[currentClass]
-    }
-    environment = environment.tail
-  }
-
-  //If the variable was found in the current class, go into that class and assign the variable
-  if (classNode != null && currentClass != null) {
-    for (let i = 0; i < classNode.value.value.body.length; i++) {
-      if (classNode.value.value.body[i].key.name == name) {
-        classNode.value.value.body[i].value.value = value
-        return environment
-      }
-    }
-  }
+  console.log('[assignClassVariables] name: ' + name)
+  //Search only in the class env
+  let environment = currentEnvironment(context).tail!
 
   if (environment.head.hasOwnProperty(name)) {
-    if (typeof environment.head[name] !== 'symbol') {
-      const v_type = get_type(value)
-      const i_type = environment.head[name]['TYPE']
+    if (typeof environment.head[name] !== 'symbol') { // Already have value
+      let v_type = get_type(value)                // Receiving Type
+      let i_type = environment.head[name]['TYPE'] // Stored Type
+
+      //Use ClassName as type
+      if (i_type === 'Class') {
+        i_type = environment.head[name].className
+      }
+      if (v_type === 'Object') { // assume to be Class
+        v_type = value.className
+      }
+
+      //Debug
+      console.log(value)
+      console.log(v_type)
+      console.log(environment)
+      console.log(i_type)
+
       if (v_type !== i_type) {
         return handleRuntimeError(
           context,
@@ -232,14 +242,20 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
       }
 
       const i_mutable = environment.head[name]['mutable']
-      const i_value = environment.head[name]['value']
-      if (i_mutable === false && i_value !== undefined) {
-        return handleRuntimeError(context, new errors.ConstAssignment(node, name))
+
+      if (environment.head[name].type === 'Literal') { // Literal variable, sometimes Type declared but no value yet
+        const i_value = environment.head[name]['value']
+        if (i_mutable === false && i_value !== undefined) {
+          return handleRuntimeError(context, new errors.ConstAssignment(node, name))
+        }
+      } else {
+        if (i_mutable === false) {
+          return handleRuntimeError(context, new errors.ConstAssignment(node, name))
+        }
       }
 
       environment.head[name]['value'] = value
-    } else {
-      // First-time initialization
+    } else { // First-time initialization (DECLARED_BUT_NOT_ASSIGNED)
       environment.head[name] = value
     }
   } else {
@@ -249,29 +265,137 @@ function assignVariables(context: Context, name: string, value: any, node: es.No
   return environment
 }
 
-function findClassProperty(context: Context, name: string, node: es.Node) {
-  console.log('[findClassProperty] name: ' + name + ' currentClass: ' + currentClass)
-  let currentClassNode
+function assignVariables(context: Context, name: string, value: any, node: es.Node) {
+  //Debug
+  console.log('[assignVariables] name: ' + name)
+  let environment = currentEnvironment(context)
+  let classNode = null
+  while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
+    // Check if the variable is a property of the current class
+    if (currentClass != null && environment.tail.head.hasOwnProperty(currentClass)) {
+      classNode = environment.tail.head[currentClass]
+    }
+    environment = environment.tail
+  }
 
-  if (currentClass != null) {
-    currentClassNode = evaluateIdentifier(context, currentClass, node)
+  //If the variable was found in the current class, go into that class and assign the variable
+  //classNode only exists if such name is not in the top environment
+  if (classNode != null && currentClass != null) {
+    //TODO: Update prop inside class
+    // for (let i = 0; i < classNode.value.value.body.length; i++) {
+    //   if (classNode.value.value.body[i].key.name == name) {
+    //     classNode.value.value.body[i].value.value = value
+    //     return environment
+    //   }
+    // }
+  }
 
-    const classProperties = currentClassNode.value.body
+  if (environment.head.hasOwnProperty(name)) {
+    if (typeof environment.head[name] !== 'symbol') { // Already have value
+      let v_type = get_type(value)                // Receiving Type
+      let i_type = environment.head[name]['TYPE'] // Stored Type
 
-    for (const property of classProperties) {
-      if (property.key.name === name) {
-        return property
+      //Use ClassName as type
+      if (i_type === 'Class') {
+        i_type = environment.head[name].className
+      }
+      if (v_type === 'Object') { // assume to be Class
+        v_type = value.className
+      }
+
+      if (v_type !== i_type) {
+        return handleRuntimeError(
+          context,
+          new errors.TypeAssignmentError(node, name, i_type, v_type)
+        )
+      }
+
+      const i_mutable = environment.head[name]['mutable']
+
+      if (environment.head[name].type === 'Literal') { // Literal variable, sometimes Type declared but no value yet
+        const i_value = environment.head[name]['value']
+        if (i_mutable === false && i_value !== undefined) {
+          return handleRuntimeError(context, new errors.ConstAssignment(node, name))
+        }
+      } else {
+        if (i_mutable === false) {
+          return handleRuntimeError(context, new errors.ConstAssignment(node, name))
+        }
+      }
+
+      environment.head[name]['value'] = value
+    } else { // First-time initialization (DECLARED_BUT_NOT_ASSIGNED)
+      environment.head[name] = value
+    }
+  } else {
+    return handleRuntimeError(context, new errors.UndefinedVariable(name, node))
+  }
+
+  return environment
+}
+
+// function findClassProperty(context: Context, name: string, node: es.Node) {
+//   console.log('[findClassProperty] name: ' + name + ' currentClass: ' + currentClass)
+//   let currentClassNode
+
+//   if (currentClass != null) {
+//     currentClassNode = evaluateIdentifier(context, currentClass, node)
+
+//     const classProperties = currentClassNode.value.body
+
+//     for (const property of classProperties) {
+//       if (property.key.name === name) {
+//         return property
+//       }
+//     }
+//   }
+//   return null
+// }
+
+function evaluateClassIdentifier(context: Context, name: string, node: es.Node) {
+  /* Will return primitive value for primitives, return a structure for functions and classes */
+  
+  // Search only within the class env
+  let environment = currentEnvironment(context)
+  while (environment.tail !== null && !environment.head.hasOwnProperty('self')) {
+    environment = environment.tail
+  }
+
+  if (environment.head.hasOwnProperty(name)) {
+    if (typeof environment.head[name] === 'symbol') {
+      return handleRuntimeError(context, new errors.UnassignedVariable(name, node))
+    } else {
+
+      if (environment.head[name]['TYPE'] == 'Function') {
+        return environment.head[name]
+      } else if (environment.head[name]['TYPE'] == 'Class') {
+        return environment.head[name]
+      } else { // TYPE == Int/Bool/... Primitive Values
+
+        if (environment.head[name]['value'] === undefined) {
+          return handleRuntimeError(
+            context,
+            new errors.UndefinedError(node, name, environment.head[name])
+          )
+        }
+        return environment.head[name]['value']
       }
     }
+  } else {
+    return handleRuntimeError(context, new errors.UndefinedVariable(name, node))
   }
-  return null
 }
 
 function evaluateIdentifier(context: Context, name: string, node: es.Node) {
+  /* Will return primitive value for primitives, return a structure for functions and classes */
   let environment = currentEnvironment(context)
   while (environment.tail !== null && !environment.head.hasOwnProperty(name)) {
     environment = environment.tail
   }
+
+  //Debug
+  // console.log(name)
+  // console.log(environment)
 
   if (environment.head.hasOwnProperty(name)) {
     //Debug
@@ -280,19 +404,20 @@ function evaluateIdentifier(context: Context, name: string, node: es.Node) {
     if (typeof environment.head[name] === 'symbol') {
       return handleRuntimeError(context, new errors.UnassignedVariable(name, node))
     } else {
-      if (environment.head[name]['value'] === undefined) {
-        return handleRuntimeError(
-          context,
-          new errors.UndefinedError(node, name, environment.head[name])
-        )
-      } else {
-        if (environment.head[name]['TYPE'] == 'Function') {
-          return environment.head[name]
-        } else if (environment.head[name]['TYPE'] == 'Class') {
-          return environment.head[name]
-        } else {
-          return environment.head[name]['value']
+
+      if (environment.head[name]['TYPE'] == 'Function') {
+        return environment.head[name]
+      } else if (environment.head[name]['TYPE'] == 'Class') {
+        return environment.head[name]
+      } else { // TYPE == Int/Bool/... Primitive Values
+
+        if (environment.head[name]['value'] === undefined) {
+          return handleRuntimeError(
+            context,
+            new errors.UndefinedError(node, name, environment.head[name])
+          )
         }
+        return environment.head[name]['value']
       }
     }
   } else {
@@ -424,13 +549,14 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         const name = node.name
         console.log('[Identifier] name:', name)
 
-        if(currentEnvironment(context).head.hasOwnProperty(name)){
-            return yield* evaluate(currentEnvironment(context).head[name], context)
-        }
+        // if(currentEnvironment(context).head.hasOwnProperty(name)){
+        //     return yield* evaluate(currentEnvironment(context).head[name], context)
+        // }
 
-        if(currentClass != null && findClassProperty(context, name, node) != null){
-            return yield* evaluate(findClassProperty(context, name, node), context)
-        }
+        // if(currentClass != null && findClassProperty(context, name, node) != null){
+        //     return yield* evaluate(findClassProperty(context, name, node), context)
+        // }
+
         return evaluateIdentifier(context, name, node)
 
         // throw new Error("Variables not supported in x-slang");
@@ -443,8 +569,82 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         const callee = evaluateIdentifier(context, callee_name, node)
         
         if(callee.TYPE === 'Class') {
-            return evaluateIdentifier(context, callee_name, node)
-        } else {
+            //Deep copy the original class obejct
+            let newClassObject = Object.assign({}, callee);
+
+            //Debug
+            // console.log(callee)
+            // console.log(newClassObject)
+
+            if (newClassObject.Method.has('init')) {
+              const initializer = newClassObject.Method.get('init')
+
+              //Debug
+              // console.log(initializer)
+
+              const class_params = []
+              const class_variables = []
+              // Create Class Env
+              class_params.push('self')
+              class_variables.push(callee_name)
+              for (const [key, value] of newClassObject.StorProp.entries()) {
+                class_params.push(key)
+                class_variables.push(value)
+              }
+              for (const [key, value] of newClassObject.CompProp.entries()) {
+                class_params.push(key)
+                class_variables.push(value)
+              }
+              for (const [key, value] of newClassObject.Method.entries()) {
+                class_params.push(key)
+                class_variables.push(value)
+              }
+
+              //Debug
+              // console.log("HERE")
+
+              const class_env = createClassEnvironment(callee_name, class_params, class_variables, context)
+              pushEnvironment(context, class_env)
+
+              // Create Local Env
+              const args = node.arguments
+              const arg_variables = []
+              for (let i = 0; i < args.length; i++) {
+                const arg_value = yield* evaluate(args[i].VALUE!, context)
+
+                //Debug
+                // console.log("ARGVALUE! EVAUATED")
+
+                const real_value = {
+                  "type": "Literal",
+                  "mutable": true,
+                  "TYPE": get_type(arg_value),
+                  "value": arg_value
+                }
+                arg_variables.push(real_value)
+              }
+
+              //Debug
+              // console.log("HERE2")
+
+              const env = createFunctionEnvironment('init', initializer.params, arg_variables, context)
+              
+              //Debug
+              // console.log(env)
+
+              pushEnvironment(context, env)
+              yield* evaluate(initializer.value, context)
+              popEnvironment(context)
+
+              // Alter the original stored property
+              for (const key of newClassObject.StorProp.keys()) {
+                newClassObject.StorProp.set(key, class_env.head[key])
+              }
+
+              popEnvironment(context)
+            }
+            return newClassObject
+        } else { // callee.TYPE === 'Function'
             const args = node.arguments
 
             const arg_variables = []
@@ -461,10 +661,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
             const env = createFunctionEnvironment(callee_name, callee.params, arg_variables, context)
             pushEnvironment(context, env)
-
-            //Debug
-            // console.log("CallExpression")
-            // console.log(currentEnvironment(context))
 
             let result = yield* evaluate(callee.value, context)
             popEnvironment(context)
@@ -592,42 +788,234 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     MemberExpression: function*(node: es.MemberExpression, context: Context) {
         //Debug
         console.log("[MemberExpression]")
-        const object = yield* evaluate(node.object, context);
-        const object_name = (<es.Identifier>node.object).name;
-        const oldClass = currentClass
-        currentClass = object_name
-        const properties = object.value.body
-        const property_name = (<es.Identifier>node.property).name
-        let property = null
-        for (let i = 0; i < properties.length; i++) {
-            if (properties[i].key.name == property_name) {
-                property = properties[i]
+        let object_name = (<es.Identifier>node.object).name;
+        let object = undefined
+        if (object_name === 'self') { // self call
+          if (node.property.type === 'Identifier') {
+            const property_name = (<es.Identifier>node.property).name
+            const value = evaluateClassIdentifier(context, property_name, node)
+
+            return value
+
+          } else if (node.property.type === 'CallExpression'){
+            const property_name = (<es.Identifier>node.property.callee).name
+            const method = evaluateClassIdentifier(context, property_name, node)
+            
+            // Create Local Env
+            const args = node.property.arguments
+            const arg_variables = []
+            for (let i = 0; i < args.length; i++) {
+              const arg_value = yield* evaluate(args[i].VALUE!, context)
+
+              //Debug
+              // console.log("ARGVALUE! EVAUATED")
+
+              const real_value = {
+                "type": "Literal",
+                "mutable": true,
+                "TYPE": get_type(arg_value),
+                "value": arg_value
+              }
+              arg_variables.push(real_value)
             }
-        }
 
-        if (property !== null) {
-            if(property.type == 'CompPropDeclaration') {
-                let getter
-                if((<es.Identifier>property.body.body[0].id).name == 'get') {
-                    getter = property.body.body[0]
-                } else {
-                    getter = property.body.body[1]
-                }
-                const env = createFunctionEnvironment('get', [], [], context)
-                pushEnvironment(context, env)
+            //Debug
+            // console.log("HERE2")
 
-                const result = yield* evaluate(getter.body, context)
+            const env = createFunctionEnvironment(property_name, method.params, arg_variables, context)
 
-                popEnvironment(context)
 
-                if (result instanceof ReturnValue) {
-                    return result.value
-                }
-            } else if (property.type == 'PropertyDefinition') {
-                return yield* evaluate(property, context);
+            pushEnvironment(context, env)
+            let result = yield* evaluate(method.value, context)
+            popEnvironment(context)
+
+            if (result instanceof ReturnValue) {
+              result = result.value
+            } else {
+              result = null
             }
+
+            return result
+            
+          }
+          
+        } else {
+          object = yield* evaluate(node.object, context); 
+
+          if (node.property.type === 'Identifier') { // Find Prop
+            const property_name = (<es.Identifier>node.property).name
+
+            if (object.StorProp.has(property_name)) { // This is a stored property
+              return object.StorProp.get(property_name).value
+            } else if (object.CompProp.has(property_name)) { // This is a computed property
+              const prop = object.CompProp.get(property_name)
+              if (prop.Get === null) {
+                return handleRuntimeError(context, new errors.RunMissingGetterError(node, property_name))
+              }
+              const getter = prop.Get
+
+              const class_params = []
+              const class_variables = []
+              // Create Class Env
+              class_params.push('self')
+              class_variables.push(object_name)
+              for (const [key, value] of object.StorProp.entries()) {
+                class_params.push(key)
+                class_variables.push(value)
+              }
+              for (const [key, value] of object.CompProp.entries()) {
+                class_params.push(key)
+                class_variables.push(value)
+              }
+              for (const [key, value] of object.Method.entries()) {
+                class_params.push(key)
+                class_variables.push(value)
+              }
+
+              //Debug
+              // console.log("HERE")
+
+              const class_env = createClassEnvironment(object_name, class_params, class_variables, context)
+              pushEnvironment(context, class_env)
+
+              // Create Local Env
+
+              //Debug
+              // console.log("HERE2")
+
+              const env = createFunctionEnvironment(property_name, getter.params, [], context)
+              
+              //Debug
+              // console.log(env)
+
+              pushEnvironment(context, env)
+              let result = yield* evaluate(getter.value, context)
+              popEnvironment(context)
+
+              // Alter the original stored property
+              for (const key of object.StorProp.keys()) {
+                object.StorProp.set(key, class_env.head[key])
+              }
+
+              popEnvironment(context)
+
+              if (result instanceof ReturnValue) {
+                result = result.value
+              } else {
+                result = null
+              }
+
+              return result
+            } else {
+            }
+
+          } else if (node.property.type === 'CallExpression'){  // Find Method
+            const property_name = (<es.Identifier>node.property.callee).name
+            const method = object.Method.get(property_name)
+
+            //Debug
+            // console.log(initializer)
+
+            const class_params = []
+            const class_variables = []
+            // Create Class Env
+            class_params.push('self')
+            class_variables.push(object_name)
+            for (const [key, value] of object.StorProp.entries()) {
+              class_params.push(key)
+              class_variables.push(value)
+            }
+            for (const [key, value] of object.CompProp.entries()) {
+              class_params.push(key)
+              class_variables.push(value)
+            }
+            for (const [key, value] of object.Method.entries()) {
+              class_params.push(key)
+              class_variables.push(value)
+            }
+
+            //Debug
+            // console.log("HERE")
+
+            const class_env = createClassEnvironment(object_name, class_params, class_variables, context)
+            pushEnvironment(context, class_env)
+
+            // Create Local Env
+            const args = node.property.arguments
+            const arg_variables = []
+            for (let i = 0; i < args.length; i++) {
+              const arg_value = yield* evaluate(args[i].VALUE!, context)
+
+              //Debug
+              // console.log("ARGVALUE! EVAUATED")
+
+              const real_value = {
+                "type": "Literal",
+                "mutable": true,
+                "TYPE": get_type(arg_value),
+                "value": arg_value
+              }
+              arg_variables.push(real_value)
+            }
+
+            //Debug
+            // console.log("HERE2")
+
+            const env = createFunctionEnvironment(property_name, method.params, arg_variables, context)
+
+
+            pushEnvironment(context, env)
+            let result = yield* evaluate(method.value, context)
+            popEnvironment(context)
+
+            // Alter the original stored property
+            for (const key of object.StorProp.keys()) {
+              object.StorProp.set(key, class_env.head[key])
+            }
+
+            popEnvironment(context)
+
+            if (result instanceof ReturnValue) {
+              result = result.value
+            } else {
+              result = null
+            }
+
+            return result
+          }
+
+          // currentClass = oldClass
         }
-        currentClass = oldClass
+        
+        // let property = null
+        // for (let i = 0; i < properties.length; i++) {
+        //     if (properties[i].key.name == property_name) {
+        //         property = properties[i]
+        //     }
+        // }
+
+        // if (property !== null) {
+        //     if(property.type == 'CompPropDeclaration') {
+        //         let getter
+        //         if((<es.Identifier>property.body.body[0].id).name == 'get') {
+        //             getter = property.body.body[0]
+        //         } else {
+        //             getter = property.body.body[1]
+        //         }
+        //         const env = createFunctionEnvironment('get', [], [], context)
+        //         pushEnvironment(context, env)
+
+        //         const result = yield* evaluate(getter.body, context)
+
+        //         popEnvironment(context)
+
+        //         if (result instanceof ReturnValue) {
+        //             return result.value
+        //         }
+        //     } else if (property.type == 'PropertyDefinition') {
+        //         return yield* evaluate(property, context);
+        //     }
+        // }
         return null
     },
 
@@ -645,24 +1033,110 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         //Debug
         console.log("[AssignmentExpression]")
 
-        const name = (<es.Identifier>node.left).name
         const value = yield* evaluate(node.right, context)
 
-        if (node.left.type == "MemberExpression") {
-            const property_name = (<es.Identifier>node.left.property).name
+        //Debug
+        // console.log(value)
+
+        if (node.left.type === "MemberExpression") {
             const object_name = (<es.Identifier>node.left.object).name
-            const objectNode = evaluateIdentifier(context, object_name, node)
-            const object_body = objectNode.value.body
-            let property_to_assign
+            const property_name = (<es.Identifier>node.left.property).name
 
-            for (let i = 0; i < object_body.length; i++) {
-                if (object_body[i].key.name == property_name) {
-                    property_to_assign = objectNode.value.body[i]
+            if (object_name === 'self') {
+              assignClassVariables(context, property_name, value, node)
+            } else {
+              const obj = yield* evaluate(node.left.object, context)
+
+              //Debug
+              // console.log(obj)
+
+              if (obj.StorProp.has(property_name)) { // This is a stored property
+                const prop = obj.StorProp.get(property_name)
+                if (prop.mutable === false) {
+                  return handleRuntimeError(context, new errors.ConstAssignment(node, property_name))
+                } else {
+                  prop.value = value
                 }
-            }
+              } else if (obj.CompProp.has(property_name)) { // This is a computed property
+                
+                const prop = obj.CompProp.get(property_name)
+                if (prop.Set === null) {
+                  return handleRuntimeError(context, new errors.RunMissingSetterError(node, property_name))
+                }
 
-            if (property_to_assign != null) {
-                if (property_to_assign.type == 'CompPropDeclaration') {
+                const setter = prop.Set
+
+                const class_params = []
+                const class_variables = []
+                // Create Class Env
+                class_params.push('self')
+                class_variables.push(object_name)
+                for (const [key, value] of obj.StorProp.entries()) {
+                  class_params.push(key)
+                  class_variables.push(value)
+                }
+                for (const [key, value] of obj.CompProp.entries()) {
+                  class_params.push(key)
+                  class_variables.push(value)
+                }
+                for (const [key, value] of obj.Method.entries()) {
+                  class_params.push(key)
+                  class_variables.push(value)
+                }
+
+                //Debug
+                // console.log("HERE")
+
+                const class_env = createClassEnvironment(object_name, class_params, class_variables, context)
+                pushEnvironment(context, class_env)
+
+                // Create Local Env
+                const arg_variables = []
+                
+                const arg_value = value
+
+                const real_value = {
+                  "type": "Literal",
+                  "mutable": true,
+                  "TYPE": get_type(arg_value),
+                  "value": arg_value
+                }
+                arg_variables.push(real_value)
+
+                //Debug
+                // console.log("HERE2")
+
+                const env = createFunctionEnvironment(property_name, setter.params, arg_variables, context)
+                
+                //Debug
+                // console.log(env)
+
+                pushEnvironment(context, env)
+                yield* evaluate(setter.value, context)
+                popEnvironment(context)
+
+                // Alter the original stored property
+                for (const key of obj.StorProp.keys()) {
+                  obj.StorProp.set(key, class_env.head[key])
+                }
+
+                popEnvironment(context)
+
+              } else {
+              }
+
+              //Debug
+              // console.log(obj)
+            }
+            
+            // for (let i = 0; i < object_body.length; i++) {
+            //     if (object_body[i].key.name == property_name) {
+            //         property_to_assign = objectNode.value.body[i]
+            //     }
+            // }
+
+            // if (property_to_assign != null) {
+            //     if (property_to_assign.type == 'CompPropDeclaration') {
                     //HANDLE COMPUTED PROPERTY HERE
                     /*
                     console.log("[type == 'CompPropDeclaration]", property_to_assign)
@@ -676,16 +1150,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
                     console.log("ENV3", currentEnvironment(context))
 
                     popEnvironment(context)
-
+                    
                      */
+            //     } else if (property_to_assign.type == 'PropertyDefinition') {
+            //         property_to_assign.value.value = value
+            //     }
+            // }
 
-                } else if (property_to_assign.type == 'PropertyDefinition') {
-                    property_to_assign.value.value = value
-                }
-            }
-
-            assignVariables(context, object_name, objectNode, node)
         } else {
+            const name = (<es.Identifier>node.left).name
             assignVariables(context, name, value, node)
         }
         return null;
@@ -695,6 +1168,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         //Debug
         const name = (<es.Identifier>node.id).name
         console.log("[FunctionDeclaration], name:", name)
+
         const real_value = {
           "type": "BlockStatement",
           "mutable": false,
@@ -719,27 +1193,102 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         console.log("[ClassDeclaration]")
         const name = (<es.Identifier>node.id).name
         const real_value = {
-            "type": "ClassBody",
-            "TYPE": "Class",
-            "value": node.body,
-            "superClass": node.superClass
+            type: "ClassBody",
+            TYPE: "Class",
+            className: name,
+            mutable: true,
+            StorProp: new Map(),
+            CompProp: new Map(),
+            Method: new Map()
+            // "superClass": node.superClass
         }
+
+        for (let i = 0; i < node.body.body.length; i++) {
+          const Prop = node.body.body[i]
+          switch(Prop.type) {
+            case "PropertyDefinition": {
+              const mutable = (Prop.kind == 'var' ? true : false)
+              let value = Prop.value
+              let type = Prop.TYPE
+
+              if (Prop.TYPE === undefined) { // Value declaration
+                value = yield* evaluate(Prop.value!, context)
+                type = get_type(value)
+              }
+
+              let sub_real_value = {
+                "type": "Literal",
+                "mutable": mutable,
+                "TYPE": type,
+                "value": value
+              }
+              real_value.StorProp.set(Prop.key.name, sub_real_value)
+              break
+            }
+            case "CompPropDeclaration": {
+              const mutable = false
+              let type = Prop.TYPE
+
+              let sub_real_value = {
+                "type": "CompProp",
+                "mutable": mutable,
+                "TYPE": type,
+                "Get": null as any,
+                "Set": null as any
+              }
+
+              for (let i = 0; i < Prop.body.body.length; i++) {
+                const GSF = Prop.body.body[i] // FunctionDeclaration for getter or setter
+                if (GSF.type === 'FunctionDeclaration') {
+                  const function_value = {
+                    "type": "BlockStatement",
+                    "mutable": false,
+                    "TYPE": "Function",
+                    "params": GSF.params,
+                    "value": GSF.body
+                  }
+                  switch (GSF.id!.name) {
+                    case 'get': {
+                      sub_real_value.Get = function_value
+                      break
+                    }
+                    case 'set': {
+                      sub_real_value.Set = function_value
+                      break
+                    }
+                  }
+                }
+              }
+              real_value.CompProp.set(Prop.key.name, sub_real_value)
+              break
+            }
+            case "MethodDefinition": {
+              const mutable = false
+
+              const sub_real_value = {
+                "type": "BlockStatement",
+                "mutable": mutable,
+                "TYPE": "Function",
+                "params": Prop.params,
+                "value": Prop.value
+              }
+
+              real_value.Method.set(Prop.key.name, sub_real_value)
+              break
+            }
+          }
+        }
+
         assignVariables(context, name, real_value, node);
+
+        //Debug
+        console.log(real_value)
 
         return null;
     },
 
     ProtocolDeclaration: function*(node: es.ProtocolDeclaration, context: Context) {
         console.log("[ProtocolDeclaration]")
-        const name = (<es.Identifier>node.id).name
-
-        const real_value = {
-            "type": "ProtocolBody",
-            "TYPE": "Protocol",
-            "value": node.body
-        }
-        assignVariables(context, name, real_value, node);
-
         return null;
     },
 
@@ -777,7 +1326,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     },
 
     BlockStatement: function*(node: es.BlockStatement, context: Context) {
+        //Debug
         console.log("[BlockStatement]")
+        console.log("HERE")
+
         const result = yield* evaluateBlockSatement(context, node)
         return result
     },

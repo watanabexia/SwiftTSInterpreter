@@ -286,3 +286,35 @@ export class UndefinedError extends RuntimeSourceError {
     return `As ${this.name} was declared with a type but you haven't assigned a value to it.`
   }
 }
+
+export class RunMissingSetterError extends RuntimeSourceError {
+  kind: string
+
+  constructor(node: es.Node, private prop: string) {
+    super(node)
+  }
+
+  public explain() {
+    return `Cannot assign to property: '${this.prop}' has no setter.`
+  }
+
+  public elaborate() {
+    return ``
+  }
+}
+
+export class RunMissingGetterError extends RuntimeSourceError {
+  kind: string
+
+  constructor(node: es.Node, private prop: string) {
+    super(node)
+  }
+
+  public explain() {
+    return `Cannot get from property: '${this.prop}' has no getter.`
+  }
+
+  public elaborate() {
+    return ``
+  }
+}
