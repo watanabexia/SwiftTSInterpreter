@@ -851,7 +851,7 @@ function _infer(
       }
 
       //Debug
-      console.log("INFER BLOCK HERE")
+      console.log('INFER BLOCK HERE')
 
       return newConstraints
     }
@@ -921,7 +921,6 @@ function _infer(
       } else {
         return addToConstraintList(constraints, [storedType, idType])
       }
-      
 
       // throw Error('Identifiers not supported for x-slang')
     }
@@ -984,7 +983,7 @@ function _infer(
       // console.log('[TYPE CHECK FUNC DECLARE]')
 
       //Debug
-      console.log("[FUNC DECLARE]1")
+      console.log('[FUNC DECLARE]1')
       console.log(node)
 
       const f_nameNode = node.id as es.Identifier
@@ -995,7 +994,7 @@ function _infer(
       const Types = []
 
       //Debug
-      console.log("[FUNC DECLARE]2")
+      console.log('[FUNC DECLARE]2')
       console.log(f_name)
 
       for (let i = 0; i < node.params.length; i++) {
@@ -1017,7 +1016,7 @@ function _infer(
       env[lastEnvID].typeMap.set(f_name, fType)
 
       //Debug
-      console.log("[FUNC DECLARE]3")
+      console.log('[FUNC DECLARE]3')
       console.log(f_name)
 
       pushEnv(env)
@@ -1027,14 +1026,14 @@ function _infer(
       }
 
       //Debug
-      console.log("[FUNC DECLARE]4")
+      console.log('[FUNC DECLARE]4')
       console.log(f_name)
 
       newConstraints = infer(node.body, env, constraints)
       env.pop()
 
       //Debug
-      console.log("[FUNC DECLARE]5")
+      console.log('[FUNC DECLARE]5')
       console.log(f_name)
 
       if (RTNType.name !== 'Undefined' && statementHasReturn(node.body)) {
@@ -1158,7 +1157,7 @@ function _infer(
             m_Type.parameterNames = param_names
 
             //REQUIRED for MethodDefinition
-            if (m_name === 'init') {  
+            if (m_name === 'init') {
               if (methNode.required) {
                 m_Type.required = true
               } else {
@@ -1364,7 +1363,7 @@ function _infer(
         const fNode = node.body.body[i] as es.FunctionDeclaration
 
         //Debug
-        console.log("FNODE")
+        console.log('FNODE')
         console.log(fNode.id!.name)
 
         newConstraints = infer(fNode, env, constraints)

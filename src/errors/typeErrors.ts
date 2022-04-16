@@ -436,9 +436,7 @@ export class MissingRequiredError implements SourceError {
 
   public explain() {
     return stripIndent`
-    Type '${this.className}' does not conform to protocol '${
-      this.protocol
-    }': initializer requirement can only be satisfied by a 'required' initializer in non-final class '${this.className}'
+    Type '${this.className}' does not conform to protocol '${this.protocol}': initializer requirement can only be satisfied by a 'required' initializer in non-final class '${this.className}'
     `
   }
 
