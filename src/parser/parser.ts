@@ -314,7 +314,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   visitModulo(ctx: ModuloContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: <'%' | '*' | '/'> ctx._operator.text,
+      operator: <'%' | '*' | '/'>ctx._operator.text,
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
@@ -323,7 +323,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   visitAddition(ctx: AdditionContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: <'+' | '-'> ctx._operator.text,
+      operator: <'+' | '-'>ctx._operator.text,
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
