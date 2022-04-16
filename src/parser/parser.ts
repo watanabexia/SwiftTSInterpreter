@@ -7,17 +7,13 @@ import { CalcLexer } from '../lang/CalcLexer'
 import {
   AdditionContext,
   CalcParser,
-  DivisionContext,
   ExprContext,
   ExprStatContext,
   EmptStatContext,
-  MultiplicationContext,
   NumberContext,
   ParenthesesContext,
-  PowerContext,
   ProgContext,
   StatContext,
-  SubtractionContext,
   DecimalContext,
   DeclareStatContext,
   NameContext,
@@ -287,38 +283,38 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitPower(ctx: PowerContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '^',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
+  // visitPower(ctx: PowerContext): es.Expression {
+  //   return {
+  //     type: 'BinaryExpression',
+  //     operator: '^',
+  //     left: this.visit(ctx._left),
+  //     right: this.visit(ctx._right),
+  //     loc: contextToLocation(ctx)
+  //   }
+  // }
 
-  visitMultiplication(ctx: MultiplicationContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '*',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-  visitDivision(ctx: DivisionContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '/',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
+  // visitMultiplication(ctx: MultiplicationContext): es.Expression {
+  //   return {
+  //     type: 'BinaryExpression',
+  //     operator: '*',
+  //     left: this.visit(ctx._left),
+  //     right: this.visit(ctx._right),
+  //     loc: contextToLocation(ctx)
+  //   }
+  // }
+  // visitDivision(ctx: DivisionContext): es.Expression {
+  //   return {
+  //     type: 'BinaryExpression',
+  //     operator: '/',
+  //     left: this.visit(ctx._left),
+  //     right: this.visit(ctx._right),
+  //     loc: contextToLocation(ctx)
+  //   }
+  // }
   visitModulo(ctx: ModuloContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '%',
+      operator: <'%' | '*' | '/'> ctx._operator.text,
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
@@ -327,22 +323,21 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   visitAddition(ctx: AdditionContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '+',
+      operator: <'+' | '-'> ctx._operator.text,
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
     }
   }
-
-  visitSubtraction(ctx: SubtractionContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '-',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
+  // visitSubtraction(ctx: SubtractionContext): es.Expression {
+  //   return {
+  //     type: 'BinaryExpression',
+  //     operator: '-',
+  //     left: this.visit(ctx._left),
+  //     right: this.visit(ctx._right),
+  //     loc: contextToLocation(ctx)
+  //   }
+  // }
   visitLogicalOr(ctx: LogicalOrContext): es.Expression {
     return {
       type: 'LogicalExpression',
