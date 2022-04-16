@@ -264,6 +264,7 @@ export interface FunctionType {
   parameterTypes: Type[]
   parameterNames?: string[]
   returnType: Type
+  required?: boolean
 }
 
 export interface ClassType {

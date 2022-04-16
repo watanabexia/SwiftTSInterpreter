@@ -420,6 +420,33 @@ export class MissingInitError implements SourceError {
   }
 }
 
+export class MissingRequiredError implements SourceError {
+  public type = ErrorType.TYPE
+  public severity = ErrorSeverity.WARNING
+
+  constructor(
+    public node: TypeAnnotatedNode<es.Node>,
+    public className: string,
+    public protocol: string
+  ) {}
+
+  get location() {
+    return this.node.loc!
+  }
+
+  public explain() {
+    return stripIndent`
+    Type '${this.className}' does not conform to protocol '${
+      this.protocol
+    }': initializer requirement can only be satisfied by a 'required' initializer in non-final class '${this.className}'
+    `
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
 export class MissingMethError implements SourceError {
   public type = ErrorType.TYPE
   public severity = ErrorSeverity.WARNING

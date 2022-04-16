@@ -35,7 +35,8 @@ import {
   ParseUnfoundError,
   ParseClassUnfoundError,
   MissingInitError,
-  MissingMethError
+  MissingMethError,
+  MissingRequiredError
 } from '../errors/typeErrors'
 
 /** Name of Unary negative builtin operator */
@@ -821,14 +822,17 @@ function _infer(
       return infer(node.expression, env, addToConstraintList(constraints, [storedType, tUndef]))
     }
     case 'ReturnStatement': {
+      //Debug
+      console.log('Return Statement')
+      console.log(node)
+      console.log(node.argument)
+
       const argNode = node.argument as TypeAnnotatedNode<es.Expression>
       infer(node.argument!, env, constraints)
 
       //Debug
-      // console.log('INFER RTN Stmt')
-      // console.log(argNode)
-      // console.log(storedType)
-      // console.log(argNode.inferredType)
+      console.log('INFER RTN Stmt')
+      console.log(argNode.inferredType)
 
       return addToConstraintList(constraints, [storedType, argNode.inferredType!])
     }
@@ -837,14 +841,18 @@ function _infer(
     case 'ForStatement':
       throw Error('Return statements not supported for x-slang')
     case 'BlockStatement': {
-      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
-
       //Debug
-      // console.log("HERE")
+      console.log('INFER BLOCK')
+
+      let newConstraints = addToConstraintList(constraints, [storedType, tUndef])
 
       for (let i = 0; i < node.body.length; i++) {
         newConstraints = infer(node.body[i], env, newConstraints)
       }
+
+      //Debug
+      console.log("INFER BLOCK HERE")
+
       return newConstraints
     }
     case 'Program': {
@@ -903,12 +911,17 @@ function _infer(
       const idType = lookupType(node.name, env) as Type
 
       //Debug
-      // console.log('IDentifIER!!!!!!')
+      console.log('IDentifIER!!!!!!')
       // console.log(node.name)
       // console.log(env)
-      // console.log(idType)
+      console.log(idType)
 
-      return addToConstraintList(constraints, [storedType, idType])
+      if (idType === undefined) {
+        return addToConstraintList(constraints, [storedType, tUndef])
+      } else {
+        return addToConstraintList(constraints, [storedType, idType])
+      }
+      
 
       // throw Error('Identifiers not supported for x-slang')
     }
@@ -970,12 +983,20 @@ function _infer(
       //Debug
       // console.log('[TYPE CHECK FUNC DECLARE]')
 
+      //Debug
+      console.log("[FUNC DECLARE]1")
+      console.log(node)
+
       const f_nameNode = node.id as es.Identifier
       const f_name = f_nameNode.name
       const RTN_Type = node.TYPE
       const RTNType = getType(node, RTN_Type)
       const param_names = []
       const Types = []
+
+      //Debug
+      console.log("[FUNC DECLARE]2")
+      console.log(f_name)
 
       for (let i = 0; i < node.params.length; i++) {
         const param = node.params[i] as es.Identifier
@@ -995,13 +1016,26 @@ function _infer(
 
       env[lastEnvID].typeMap.set(f_name, fType)
 
+      //Debug
+      console.log("[FUNC DECLARE]3")
+      console.log(f_name)
+
       pushEnv(env)
-      for (let i = 0; i < Types.length - 1; i++) {
+      for (let i = 0; i < param_names.length; i++) {
         env[env.length - 1].typeMap.set(param_names[i], Types[i])
         env[env.length - 1].declKindMap.set(param_names[i], 'var')
       }
+
+      //Debug
+      console.log("[FUNC DECLARE]4")
+      console.log(f_name)
+
       newConstraints = infer(node.body, env, constraints)
       env.pop()
+
+      //Debug
+      console.log("[FUNC DECLARE]5")
+      console.log(f_name)
 
       if (RTNType.name !== 'Undefined' && statementHasReturn(node.body)) {
         //Debug
@@ -1123,11 +1157,21 @@ function _infer(
             const m_Type = tFunc(...m_Types)
             m_Type.parameterNames = param_names
 
+            //REQUIRED for MethodDefinition
+            if (m_name === 'init') {  
+              if (methNode.required) {
+                m_Type.required = true
+              } else {
+                m_Type.required = false
+              }
+            }
+
             methodNames.push(m_name)
             methodTypes.push(m_Type)
 
             env[env.length - 1].typeMap.set(m_name, m_Type) // Register to the class env
             env[env.length - 1].declKindMap.set(m_name, m_DType)
+
             break
           case 'CompPropDeclaration':
             const compNode = node.body.body[i] as TypeAnnotatedNode<es.CompPropDeclaration>
@@ -1160,6 +1204,11 @@ function _infer(
 
       env[env.length - 1].typeMap.set(name, classType)
 
+      //Debug
+      // console.log("CHECK HERE 0")
+      // console.log(name)
+      // console.log(node.superClass)
+
       //Typecheck the body of Computed Property and Methods
       for (let i = 0; i < node.body.body.length; i++) {
         switch (node.body.body[i].type) {
@@ -1180,10 +1229,18 @@ function _infer(
       //Add to the env after pop the temporary class env
       env[env.length - 1].typeMap.set(name, classType)
 
+      //Debug
+      // console.log("CHECK HERE 1")
+      // console.log(name)
+      // console.log(node.superClass)
+
       //Protocol Check
       if (node.superClass !== null) {
         const protocolName = (<es.Identifier>node.superClass).name
         const protocolType = lookupType(protocolName, env) as Protocol
+
+        //Debug
+        // console.log("CHECK HERE 2")
 
         //Check Properties
         for (let i = 0; i < protocolType.PropNames.length; i++) {
@@ -1233,6 +1290,12 @@ function _infer(
           const p_index = methodNames.indexOf(protoMethodName)
           if (p_index !== -1) {
             const foundMethodTypes = methodTypes[p_index]
+
+            if (protoMethodName === 'init') {
+              if (foundMethodTypes.required === false) {
+                typeErrors.push(new MissingRequiredError(node, name, protocolName))
+              }
+            }
 
             const protoParamNames = protoMethodType.parameterNames!
             const foundParamNames = protoMethodType.parameterNames!
@@ -1299,6 +1362,11 @@ function _infer(
       env[env.length - 1].typeMap.set('self', tUndef)
       for (let i = 0; i < node.body.body.length; i++) {
         const fNode = node.body.body[i] as es.FunctionDeclaration
+
+        //Debug
+        console.log("FNODE")
+        console.log(fNode.id!.name)
+
         newConstraints = infer(fNode, env, constraints)
       }
       env.pop()
