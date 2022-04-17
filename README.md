@@ -1,122 +1,105 @@
-X-slang is a reference implementation of a simple calculator language
-conforming to the `<language>-slang` API accepted by the Source academy frontend. 
-X-slang internally uses antlr4ts to automatically generate a parser and can serve as
-a starting point for students to build their own Source-academy compatible language
-implementations.
+# Swift-Barcelona: Swift Language Support for Source Academy
+Swift-Barcelona is a subset of Swift 5. This repository is the Source-academy compatible implementation of Swift-Barcelona, conforming to the `<language>-slang` API.
 
-Usage
+Installation
 =====
 
-To build,
+To write Swift-Barcelona codes on Source Academy on your local machine,
 
+1. Clone the repository [cs4215-project-2022-barcelona](https://github.com/nus-cs4215/cs4215-project-2022-barcelona) to your machine. This
+repository contains the implementation of Swift-Barcelona.
+
+2. Clone the repository [cs4215-project-2022-frontend-barcelona](https://github.com/nus-cs4215/cs4215-project-2022-frontend-barcelona) to the same
+folder on your machine. This repository contains the Source Academy.
+1. Go to the repository folder `cs4215-project-2022-barcelona` in the terminal.
+2. Run the following command to install required dependencies:
 ``` {.}
-$ git clone https://<url>/x-slang.git
-$ cd x-slang
-$ yarn
+$ yarn install
+```
+5. Replace the file `node_modules/@types/estree/index.d.ts` with [this file](https://github.com/nus-cs4215/cs4215-project-2022-barcelona/blob/master/node_modules/%40types/estree/index.d.ts).
+
+The reason for this step is that installing the dependencies in the previous
+step would overwrite the modified ESTree file, and the modified ESTree file is
+necessary for Swift-Barcelona.
+6. Generate the antlr4ts lexer and parser with the following command:
+``` {.}
+$ yarn run antlr4ts
+```
+7. Delete line 9-11 of the file src/lang/CalcLexer.ts.
+``` typescript
+import { LexerATNSimulator } from "antlr4ts/atn/LexerATNSimulator";
+import { NotNull } from "antlr4ts/Decorators"; // REMOVE
+import { Override } from "antlr4ts/Decorators"; // REMOVE
+import { RuleContext } from "antlr4ts/RuleContext"; // REMOVE
+import { Vocabulary } from "antlr4ts/Vocabulary";
+```
+
+The reason for this step is that although `NotNull`, `Override`, `RuleContext` are auto-generated, they are never used in this file which will stop users from building the project.
+
+8. Delete line 7, 9, 13-14 of the file src/lang/CalcParser.ts.
+``` typescript
+import { FailedPredicateException } from "antlr4ts/FailedPredicateException";
+import { NotNull } from "antlr4ts/Decorators"; // REMOVE
+import { NoViableAltException } from "antlr4ts/NoViableAltException";
+import { Override } from "antlr4ts/Decorators"; // REMOVE
+import { Parser } from "antlr4ts/Parser";
+import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
+import { ParserATNSimulator } from "antlr4ts/atn/ParserATNSimulator";
+import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener"; // REMOVE
+import { ParseTreeVisitor } from "antlr4ts/tree/ParseTreeVisitor"; // REMOVE
+import { RecognitionException } from "antlr4ts/RecognitionException";
+```
+
+The reason for this step is that although `NotNull`, `Override`,
+`ParserTreeListener`, `ParserTreeVisitor` are auto-generated, they are
+never used in this file which will stop users from building the project.
+9. Build the project with the following command:
+```{.}
 $ yarn build
 ```
-
-To add \"x-slang\" to your PATH, build it as per the above
-instructions, then run
-
-``` {.}
-$ cd dist
-$ npm link
-```
-
-If you do not wish to add \"x-slang\" to your PATH, replace
-\"x-slang\" with \"node dist/repl/repl.js\" in the following examples.
-
-To try out *Source* in a REPL, run
-
-``` {.}
-$ x-slang '1 * 1'
-```
-
-Hint: In `bash` you can take the `PROGRAM_STRING` out
-of a file as follows:
-
-``` {.}
-$ x-slang "$(< my_source_program.js)"
-```
-
-Getting Started
-===========================================
-
-As a starting point, we recommend that students start by looking at the following files of interest:
-
-1. The grammar for the calculator language is defined in [src/lang/calc.g4](./src/lang/Calc.g4) as an ANTLR Grammar, and the other files in `./src/lang/` are generated from this file using the `antlr4ts` rule (i.e `yarn run antlr4ts`) defined in [./package.json](./package.json):
-
-```js
-// file: package.json
-{
-  // ...
-  "scripts": {
-    // ...
-    "antlr4ts": "antlr4ts -visitor ./src/lang/Calc.g4"
-  }
-  // ...
-}
-```
-Students can find a collection of ANTLR grammars of popular languages online at [grammars-v4](https://github.com/antlr/grammars-v4)
-
-
-As the focus of this course is not in parsing, we recommend reusing or adapting one of these grammars (or something similar you can find online) for your project.
-
-
-2. The [src/parser/parser.ts](./src/parser/parser.ts) module then imports and invokes the ANTLR4 generated parser (see line 240):
-
-```typescript
-    const inputStream = new ANTLRInputStream(source)
-    const lexer = new CalcLexer(inputStream)
-    const tokenStream = new CommonTokenStream(lexer)
-    const parser = new CalcParser(tokenStream)
-    ...
-    const tree = parser.expression()
-    ...
-```
-  As the ANTLR generated AST, being machine generated, tends to be rather human-unfriendly, we then map the ANTLR parse tree into a simplified AST for further processing using the auto-generated ANTLR visitor classes to traverse the ast:
-  
-  ```typescript
-  // Subclassing the ANTLR-generated visitor
-  class ExpressionGenerator implements CalcVisitor<es.Expression> {
-  ...
-  }
-  
-  
-  function convertExpression(expression: ExpressionContext): es.Expression {
-    const generator = new ExpressionGenerator()
-    return expression.accept(generator)
-  }
-  ```
-  
- For simplicity, in this initial implementation we just map to the `es.Expression` type provided by the [esTree library](https://hexdocs.pm/estree/ESTree.html) to represent the AST of javascript programs, but depending on the language, students may need to define their own ASTs from scratch - in such cases, we recommend looking at the definition of the ESTree AST as a reference, as this will make integrating with the Source Academy API easier.
-
-3. Having parsed the AST, the evaluation is handled in [src/interpreter/interpreter.ts](./src/interpreter/interpreter.ts), and type checking is done in [src/typeChecker/typeChecker.ts](./src/typeChecker/typeChecker.ts).
-
-Once you have the parser and evaluator working, you can try out your implementation using the repl described in the previous section.
-
-When you are happy with your implementation, only then we recommend connecting the language-backend (`x-slang`) with the frontend (`x-frontend`), and for this, see the next section:
-
-Using your x-slang in local Source Academy
-===========================================
-
-A common issue when developing modifications to x-slang is how to test
-it using your own local frontend. Assume that you have built your own
-x-frontend locally, here is how you can make it use your own
-x-slang, instead of the one that the Source Academy team has deployed
-to npm.
-
-First, build and link your local x-slang:
-``` {.}
-$ cd x-slang
-$ yarn build
+10.  Link the project:
+```{.}
 $ yarn link
 ```
-Then, from your local copy of x-frontend:
-``` {.}
-$ cd x-frontend
-$ yarn link "x-slang"
+11. Go to the folder `cs4215-project-2022-frontend-barcelona` in the terminal.
+    
+13. Link the frontend to the built implementation of Swift-Barcelona:
+```{.}
+$ yarn link x-slang
+```
+14.  Delete line 49 of the file `package.json`
+```json
+"flexboxgrid-helpers": "^1.1.3",
+"x-slang": "^0.4.70", // REMOVE
+"lodash": "^4.17.20",
 ```
 
-Then start the frontend and the new x-slang will be used. 
+The reason for this step is that we are using the x-slang of our own. Delete
+this line so that it will not try to find x-slang online when installing the
+dependencies in the next step. We will need to add it back after installing the dependencies in step 16.
+
+15.  Install required dependencies:
+```{.}
+$ yarn install
+```
+16. Add
+`"x-slang":"^0.4.70",`
+back to the file `package.json`.
+```json
+"flexboxgrid-helpers": "^1.1.3",
+"x-slang": "^0.4.70", // ADD
+"lodash": "^4.17.20",
+```
+
+17. Start the Source Academy:
+```{.}
+$ yarn run start
+```
+18. When you see `Compiled successfully!` in the terminal, access Source
+Academy in your browser at [localhost:8000](http://localhost:8000).
+
+19. Happy coding!
+
+Test Case
+=====
+The sample test code can be found in [this folder]().
