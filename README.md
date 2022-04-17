@@ -18,6 +18,7 @@ This repository contains the Source Academy.
 
 ## Build Swift-Barcelona
 1. Go to the repository folder `cs4215-project-2022-barcelona` in the terminal.
+
 2. Run the following command to install required dependencies:
 ``` {.}
 $ yarn install
