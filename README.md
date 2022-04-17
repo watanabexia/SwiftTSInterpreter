@@ -88,7 +88,7 @@ $ yarn link x-slang
 
 The reason for this step is that we are using the x-slang of our own. Delete
 this line so that it will not try to find x-slang online when installing the
-dependencies in the next step. We will need to add it back after installing the dependencies in step 16.
+dependencies in the next step. We will need to add it back after installing the dependencies.
 
 4.  Install required dependencies:
 ```{.}
