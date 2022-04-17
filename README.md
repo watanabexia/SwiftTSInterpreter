@@ -102,4 +102,4 @@ Academy in your browser at [localhost:8000](http://localhost:8000).
 
 Test Case
 =====
-The sample test code can be found in [this folder]().
+The sample test code can be found in [testcase](https://github.com/nus-cs4215/cs4215-project-2022-barcelona/tree/master/testcase).
